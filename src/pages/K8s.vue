@@ -2,7 +2,7 @@
   name: Kubernetes Settings
 </router>
 <template>
-  <Notifications :notifications="notifications">
+  <Notifications :notifications="notificationsList">
     <select class="select-k8s-version" :value="settings.kubernetes.version" @change="onChange($event)">
       <option v-for="item in versions" :key="item" :value="item">
         {{ item }}
@@ -67,6 +67,8 @@ const K8s = require('../k8s-engine/k8s.js');
 
 /** @typedef { import("../config/settings").Settings } Settings */
 
+const NotificationLevels = ['error', 'warning', 'info', 'success'];
+
 export default {
   name:       'K8s',
   title:      'Kubernetes Settings',
@@ -78,15 +80,16 @@ export default {
   },
   data() {
     return {
-      state:    ipcRenderer.sendSync('k8s-state'),
+      /** @type {{ key: string, message: string, level: string }} */
+      notifications: { },
+      state:         ipcRenderer.sendSync('k8s-state'),
       /** @type Settings */
-      settings: ipcRenderer.sendSync('settings-read'),
-      versions: require('../generated/versions.json'),
-      symlinks: {
+      settings:      ipcRenderer.sendSync('settings-read'),
+      versions:      require('../generated/versions.json'),
+      symlinks:      {
         helm:    null,
         kubectl: null,
       },
-      warnings: {},
     };
   },
 
@@ -100,12 +103,14 @@ export default {
     cannotReset() {
       return (this.state !== K8s.State.STARTED && this.state !== K8s.State.READY);
     },
-    notifications() {
-      return Object.keys(this.warnings).map(key => ({
+    notificationsList() {
+      return Object.keys(this.notifications).map(key => ({
         key,
-        message: this.warnings[key],
-        color:   'error',
-      }));
+        message: this.notifications[key].message,
+        color:   this.notifications[key].level,
+      })).sort((left, right) => {
+        return NotificationLevels.indexOf(left.level) - NotificationLevels.indexOf(right.level);
+      });
     },
   },
 
@@ -182,13 +187,18 @@ export default {
     onRancherModeChanged() {
       ipcRenderer.invoke('settings-write', { kubernetes: { rancherMode: this.$data.settings.kubernetes.rancherMode } });
     },
-    handleWarning(warning, message) {
+    handleNotification(level, key, message) {
       if (message) {
-        this.$set(this.warnings, warning, message);
+        this.$set(this.notifications, key, {
+          key, level, message
+        });
       } else {
-        this.$delete(this.warnings, warning);
+        this.$delete(this.notifications, key);
       }
-    }
+    },
+    handleWarning(key, message) {
+      this.handleNotification('warning', key, message);
+    },
   },
 };
 </script>
