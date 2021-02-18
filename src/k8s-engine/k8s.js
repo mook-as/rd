@@ -5,6 +5,8 @@ const { Minikube } = require('./minikube.js');
 const { OSNotImplemented } = require('./notimplemented.js');
 const { KubeClient } = require('./client');
 
+/** @typedef { import("../config/settings").Settings } Settings */
+
 const State = {
   STOPPED:  0, // The engine is not running.
   STARTING: 1, // The engine is attempting to start.
@@ -16,7 +18,10 @@ const State = {
 
 Object.freeze(State);
 
-//
+/**
+ * Create a new handler for Kubernetes clusters.
+ * @param {Settings["kubernetes"]} cfg Kubernetes configuration
+ */
 function factory(cfg) {
   switch (os.platform()) {
   case 'darwin':

@@ -13,9 +13,12 @@ const K8s = require('./src/k8s-engine/k8s.js');
 const resources = require('./src/resources');
 // TODO: rewrite in typescript. This was just a quick proof of concept.
 
+/** @typedef { import("./src/config/settings").Settings } Settings */
+
 app.setName('Rancher Desktop');
 
 let k8smanager;
+/** @type Settings */
 let cfg;
 let tray = null;
 let gone = false; // when true indicates app is shutting down
@@ -340,6 +343,10 @@ function handleFailure(payload) {
   dialog.showErrorBox(`Error ${ titlePart }`, message);
 }
 
+/**
+ * Return a new Kubernetes manager
+ * @param {Settings["kubernetes"]} cfg The configuration
+ */
 function newK8sManager(cfg) {
   const mgr = K8s.factory(cfg);
 

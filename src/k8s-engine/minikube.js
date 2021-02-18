@@ -65,6 +65,10 @@ class Minikube extends EventEmitter {
    */
   #currentType
 
+  /**
+   * Construct a new minikube handler.
+   * @param {Settings["kubernetes"]} cfg
+   */
   constructor(cfg) {
     super();
     this.cfg = cfg;
