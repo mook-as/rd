@@ -193,8 +193,18 @@ div.slider-label {
   margin-top: 6px;
 }
 
+.vue-slider >>> .vue-slider-rail {
+  background-color: var(--muted);
+}
+.vue-slider >>> .vue-slider-mark {
+  background-color: var(--muted-banner-bg);
+}
+.vue-slider >>> .vue-slider-dot-handle {
+  background-color: var(--body-bg);
+  box-shadow: 0.5px 0.5px 2px 1px var(--darker);
+}
 .vue-slider >>> .vue-slider-process {
-  background-color: orange;
+  background-color: var(--error);
 }
 
 </style>
