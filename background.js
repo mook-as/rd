@@ -146,6 +146,8 @@ ipcMain.handle('settings-write', (event, arg) => {
   event.sender.sendToFrame(event.frameId, 'settings-update', cfg);
   k8smanager?.emit('settings-update', cfg);
   tray?.emit('settings-update', cfg);
+
+  ipcMain.emit('k8s-restart-required');
 });
 
 ipcMain.on('k8s-state', (event) => {
@@ -185,6 +187,13 @@ ipcMain.on('k8s-reset', async(event, arg) => {
   } catch (ex) {
     handleFailure(ex);
   }
+});
+
+ipcMain.on('k8s-restart-required', async() => {
+  /** @type {Object.<string, [any, any] | []>} */
+  const restartRequired = (await k8smanager?.requiresRestartReasons()) ?? {};
+
+  window.send('k8s-restart-required', restartRequired);
 });
 
 ipcMain.on('k8s-restart', async() => {
