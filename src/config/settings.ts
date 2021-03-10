@@ -1,13 +1,11 @@
-'use strict';
-
 // This file contains the code to work with the settings.json file along with
 // code docs on it.
 
-const fs = require('fs');
-const util = require('util');
-const { dirname, join } = require('path');
-const deepmerge = require('deepmerge');
-const isDeepEqual = require('lodash/isEqual');
+import fs from 'fs';
+import util from 'util';
+import { dirname, join } from 'path';
+import deepmerge from 'deepmerge';
+import isDeepEqual from 'lodash/isEqual';
 const paths = require('xdg-app-paths')({ name: 'rancher-desktop' });
 
 // Settings versions are independent of app versions.
@@ -17,8 +15,6 @@ const paths = require('xdg-app-paths')({ name: 'rancher-desktop' });
 // Version incrementing is for when a breaking change is introduced in the settings object.
 
 const CURRENT_SETTINGS_VERSION = 1;
-
-/** @typedef {typeof defaultSettings} Settings */
 
 const defaultSettings = {
   version:    CURRENT_SETTINGS_VERSION,
@@ -31,16 +27,17 @@ const defaultSettings = {
   },
 };
 
+export type Settings = typeof defaultSettings;
+
 /**
  * Load the settings file
- * @returns {Settings}
  */
-function load() {
+export function load(): Settings {
   const rawdata = fs.readFileSync(join(paths.config(), 'settings.json'));
   let settings;
 
   try {
-    settings = JSON.parse(rawdata);
+    settings = JSON.parse(rawdata.toString());
   } catch (_) {
     save(defaultSettings);
 
@@ -58,10 +55,9 @@ function load() {
 
 /**
  * Verify that the loaded version of kubernetes, if specified, is in the current list of supported versions.  Throw an exception if not.
- * @param{Object} settings
  */
 
-function verifyLocalSettings(settings) {
+function verifyLocalSettings(settings: Settings) {
   const supportedVersions = require('@/generated/versions.json');
   const proposedVersion = settings.kubernetes?.version;
 
@@ -75,7 +71,7 @@ function verifyLocalSettings(settings) {
   }
 }
 
-function save(cfg) {
+export function save(cfg: Settings) {
   try {
     fs.mkdirSync(paths.config(), { recursive: true });
     const rawdata = JSON.stringify(cfg);
@@ -95,17 +91,16 @@ function save(cfg) {
 /**
  * Remove all stored settings.
  */
-async function clear() {
+export async function clear() {
   // The node version packed with electron might not have fs.rm yet.
-  await util.promisify(fs.rm ?? fs.rmdir)(paths.config(), { recursive: true, force: true });
+  await util.promisify(fs.rmdir as any)(paths.config(), { recursive: true, force: true });
 }
 
 /**
  * Load the settings file or create it if not present.
- * @returns {Settings}
  */
-function init() {
-  let settings = {};
+export function init(): Settings {
+  let settings: Settings;
 
   try {
     settings = load();
@@ -121,7 +116,7 @@ function init() {
   return settings;
 }
 
-async function isFirstRun() {
+export async function isFirstRun() {
   const settingsPath = join(paths.config(), 'settings.json');
 
   try {
@@ -140,7 +135,7 @@ async function isFirstRun() {
 class InvalidStoredSettings extends Error {
 }
 
-function safeFileTest(path, conditions) {
+function safeFileTest(path: string, conditions: number) {
   try {
     fs.accessSync(path, conditions);
 
@@ -150,7 +145,7 @@ function safeFileTest(path, conditions) {
   }
 }
 
-function fileExists(path) {
+function fileExists(path: string) {
   try {
     fs.statSync(path);
 
@@ -160,7 +155,7 @@ function fileExists(path) {
   }
 }
 
-function fileIsWritable(path) {
+function fileIsWritable(path: string) {
   try {
     fs.accessSync(path, fs.constants.W_OK);
 
@@ -173,14 +168,12 @@ function fileIsWritable(path) {
 /**
  * Simple function to wrap paths with spaces with double-quotes. Intended for human consumption.
  * Trying to avoid adding yet another external dependency.
- * @param {string} fullpath
- * @returns {string}
  */
-function quoteIfNeeded(fullpath) {
+function quoteIfNeeded(fullpath: string): string {
   return /\s/.test(fullpath) ? `"${ fullpath }"` : fullpath;
 }
 
-function parseSaveError(err) {
+function parseSaveError(err: any) {
   const msg = err.toString();
 
   console.log(`settings save error: ${ msg }`);
@@ -211,8 +204,6 @@ function parseSaveError(err) {
 /**
  * Provide an array of updating functions
  *
- * @type {Array.<Object.<number, (typeof defaultSettings)> => void>}
- *
  * It is currently empty, but if there are any changes across versions,
  * they should be done in a function that modifies the settings arg.  The main use-cases
  * are for renaming property names, correct values that are no longer valid, and removing
@@ -220,7 +211,7 @@ function parseSaveError(err) {
  * for every version change, as most changes will get picked up from the defaults.
  *
  */
-const updateTable = {};
+const updateTable: Record<number, (settings: Settings) => void> = {};
 
 /* Example entry for going from version 3 to 4
 let updateTable = {
@@ -237,7 +228,7 @@ let updateTable = {
 };
 */
 
-function updateSettings(settings) {
+function updateSettings(settings: Settings) {
   if (Object.keys(settings).length === 0) {
     return defaultSettings;
   }
@@ -270,7 +261,3 @@ function updateSettings(settings) {
 
   return deepmerge(defaultSettings, settings);
 }
-
-module.exports = {
-  init, load, save, clear, isFirstRun
-};
