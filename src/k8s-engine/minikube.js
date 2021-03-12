@@ -20,7 +20,7 @@ const util = require('util');
 const paths = require('xdg-app-paths')({ name: 'rancher-desktop' });
 const resources = require('../resources');
 const Homestead = require('./homestead.js');
-const K8s = require('./k8s.js');
+const K8s = require('./k8s');
 
 /** @typedef { import("../config/settings").Settings } Settings */
 
@@ -361,7 +361,7 @@ class Minikube extends EventEmitter {
     });
   }
 
-  async reset(version) {
+  async reset() {
     while (this.#currentType !== undefined) {
       await sleep(500);
     }
@@ -377,9 +377,6 @@ class Minikube extends EventEmitter {
       this.#client?.destroy();
       await this.exec(...sudo, 'systemctl', 'stop', 'kubelet.service', { stdio: 'inherit' });
       await this.exec(...sudo, 'rm', '-rf', '/var/lib/k3s/server/db', { stdio: 'inherit' });
-      if (version) {
-        // change versions here
-      }
       await this.exec(...sudo, 'systemctl', 'start', 'kubelet.service', { stdio: 'inherit' });
       await this.exec(...sudo, 'systemctl', 'is-active', '--wait', 'kubelet.service', { stdio: 'inherit' });
       // Reset the state flag only if we haven't raced with something else.
