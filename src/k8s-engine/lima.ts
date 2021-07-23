@@ -404,6 +404,35 @@ export default class LimaBackend extends events.EventEmitter implements K8s.Kube
       // Start the VM; if it's already running, this does nothing.
       await this.lima('start', '--tty=false', await this.isRegistered ? MACHINE_NAME : CONFIG_PATH);
 
+      // Set up transparent proxy:
+      const script = `
+        redsocks -c /etc/redsocks.conf
+        iptables -t nat -N mitmproxy
+        # Allow anything talking to localhost
+        iptables -t nat -A mitmproxy -d 127.0.0.0/8 -j RETURN
+        # Allow anything talking to private IP ranges
+        iptables -t nat -A mitmproxy -d 10.0.0.0/8 -j RETURN
+        iptables -t nat -A mitmproxy -d 172.16.0.0/12 -j RETURN
+        iptables -t nat -A mitmproxy -d 192.168.0.0/16 -j RETURN
+        # Everything not whitelisted goes to the SOCKS proxy
+        iptables -t nat -A mitmproxy -p tcp -j REDIRECT --to-port 1081
+        iptables -t nat -A OUTPUT -p tcp -j mitmproxy
+        wget -O /usr/local/share/ca-certificates/mitmproxy.crt http://mitm.it/cert/pem
+        update-ca-certificates
+      `;
+
+      for (const line of script.split(/\r?\n/)) {
+        const words = line.trim().split(/\s+/).filter(x => x);
+
+        if (words.length > 0) {
+          if (words[0].startsWith('#')) {
+            continue;
+          }
+          console.log(`+ sudo ${ words.join(' ') }`);
+          await this.ssh('sudo', ...words);
+        }
+      }
+
       // Copy in the helpers and make them executable.  Note that we can't run the commands in
       // parallel, as that causes issues with the SSH control socket being closed.
       await this.ssh('mkdir', '-p', 'bin');
@@ -426,6 +455,9 @@ export default class LimaBackend extends events.EventEmitter implements K8s.Kube
         { env: this.limaEnv, stdio: ['ignore', logStream, logStream] });
 
       this.process.on('exit', async(status, signal) => {
+        await console.log(`Ignoring k3s exit! ${ status }/${ signal }`);
+
+        /*
         if ([0, null].includes(status) && ['SIGTERM', null].includes(signal)) {
           console.log(`K3s exited gracefully.`);
           await this.stop();
@@ -437,6 +469,7 @@ export default class LimaBackend extends events.EventEmitter implements K8s.Kube
           this.setState(K8s.State.ERROR);
           this.setProgress(Progress.EMPTY);
         }
+        */
       });
 
       await this.k3sHelper.waitForServerReady(() => Promise.resolve('127.0.0.1'), desiredPort);

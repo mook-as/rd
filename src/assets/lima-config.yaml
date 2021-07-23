@@ -21,3 +21,26 @@ provision:
       mount --bind "/mnt/data/${dir}" "${dir}"
     done
     echo "Done mounting Rancher persistent volumes."
+
+    # Add stuff for proxy testing
+    echo "Doing proxy testing setup..." >&2
+    apk update
+    apk add iptables ip6tables redsocks
+
+    cat > /etc/redsocks.conf << 'EOF'
+    base {
+        log_debug = off;
+        log_info = on;
+        log = "file:/var/log/redsocks.log";
+        daemon = on;
+        redirector = iptables;
+    }
+
+    redsocks {
+        local_port = 1081;
+        ip = 192.168.5.2;
+        port = 1080;
+        type = socks5;
+    }
+    EOF
+
