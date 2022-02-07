@@ -214,12 +214,15 @@ export class KubeClient extends events.EventEmitter {
    */
   constructor() {
     super();
+    console.log('>> KubeClient constructor');
     this.kubeconfig.loadFromDefault();
     this.kubeconfig.currentContext = 'rancher-desktop';
+    console.log(this.kubeconfig.exportConfig());
     this.forwarder = new k8s.PortForward(this.kubeconfig, true);
     this.shutdown = false;
     this.coreV1API = this.kubeconfig.makeApiClient(k8s.CoreV1Api);
     this.services = null;
+    console.log('<< KubeClient constructor');
   }
 
   get k8sClient() {

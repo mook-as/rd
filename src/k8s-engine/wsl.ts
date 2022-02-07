@@ -1089,14 +1089,17 @@ export default class WSLBackend extends events.EventEmitter implements K8s.Kuber
           this.lastCommandComment,
           100,
           this.k3sHelper.waitForServerReady(() => this.ipAddress, this.#desiredPort));
+        console.log('Updating kubeconfig');
         this.lastCommandComment = 'Updating kubeconfig';
         await this.progressTracker.action(
           this.lastCommandComment,
           100,
           this.k3sHelper.updateKubeconfig(
             async() => await this.captureCommand(await this.getWSLHelperPath(), 'k3s', 'kubeconfig')));
+        console.log('Kubeconfig updated');
 
         if (this.#currentContainerEngine === ContainerEngine.MOBY) {
+          console.log('Starting host docker socket proxy');
           await this.progressTracker.action(
             this.lastCommandComment,
             100,
@@ -1116,12 +1119,15 @@ export default class WSLBackend extends events.EventEmitter implements K8s.Kuber
             });
         }
 
+        console.log('Waiting for services');
         this.lastCommandComment = 'Waiting for services';
         await this.progressTracker.action(
           this.lastCommandComment,
           50,
           async() => {
+            console.log('About to create new K8s client');
             this.client = new K8s.Client();
+            console.log('New K8s client created');
             await this.client.waitForServiceWatcher();
             this.client.on('service-changed', (services) => {
               this.emit('service-changed', services);
@@ -1132,9 +1138,11 @@ export default class WSLBackend extends events.EventEmitter implements K8s.Kuber
         this.emit('current-port-changed', this.currentPort);
 
         // Trigger kuberlr to ensure there's a compatible version of kubectl in place
+        console.log('Triggering kuberlr');
         await childProcess.spawnFile(resources.executable('kubectl'), ['config', 'current-context'],
           { stdio: Logging.k8s });
 
+        console.log('Waiting for nodes');
         this.lastCommandComment = 'Waiting for nodes';
         await this.progressTracker.action(
           this.lastCommandComment,
@@ -1148,6 +1156,7 @@ export default class WSLBackend extends events.EventEmitter implements K8s.Kuber
         // See comments for this code in lima.ts:start()
 
         if (config.checkForExistingKimBuilder) {
+          console.log('Checking for existing kim builder');
           this.client ??= new K8s.Client();
           await getImageProcessor(this.#currentContainerEngine, this).removeKimBuilder(this.client.k8sClient);
           // No need to remove kim builder components ever again.
@@ -1155,6 +1164,7 @@ export default class WSLBackend extends events.EventEmitter implements K8s.Kuber
           this.emit('kim-builder-uninstalled');
         }
         if (this.#currentContainerEngine === ContainerEngine.CONTAINERD) {
+          console.log('Starting buildkitd');
           await this.execCommand('/usr/local/bin/wsl-service', '--ifnotstarted', 'buildkitd', 'start');
         }
 
