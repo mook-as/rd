@@ -79,7 +79,7 @@ class Builder {
     // environment variable `__COMPAT_LAYER=RunAsInvoker` to force the installer
     // to run as the existing user.
     const env = { ...process.env, __COMPAT_LAYER: 'RunAsInvoker' };
-    const fullBuildVersion = childProcess.execFileSync('git', ['describe', '--tags']).toString().trim();
+    const fullBuildVersion = childProcess.execFileSync('git', ['describe', '--tags', '--always']).toString().trim();
     const finalBuildVersion = fullBuildVersion.replace(/^v/, '');
     const appData = 'packaging/linux/rancher-desktop.appdata.xml';
     const release = `<release version="${ finalBuildVersion }" date="${ new Date().toISOString() }"/>`;

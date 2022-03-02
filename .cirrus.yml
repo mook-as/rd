@@ -18,7 +18,6 @@ task:
     memory: 16G
   env:
     DEBIAN_FRONTEND: noninteractive
-    CI: true
     CIRRUS_CLONE_DEPTH: 0 # Required to get app version
     FORCE_COLOR: 1 # force terminal color
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1 # disable auto-browser download
@@ -78,3 +77,131 @@ task:
       cp -R /home/ranchertest/src/e2e/reports/* /tmp/cirrus-ci-build/e2e/reports/
     playwright_artifacts:
       path: "/tmp/cirrus-ci-build/e2e/reports/*"
+
+build_task:
+  trigger_type: manual
+  container:
+    image: 'ubuntu:20.04'
+  env:
+    DEBIAN_FRONTEND: noninteractive
+    CIRRUS_CLONE_DEPTH: '0' # Required to get app version
+    NODE_VERSION: node_16.x
+  timeout_in: 20
+
+  install_deps_script: >
+    apt-get update && apt-get install --yes --no-install-recommends
+    ca-certificates
+    curl
+    git
+    gnupg
+
+  install_golang_script: |
+    curl -L https://go.dev/dl/go1.18rc1.linux-amd64.tar.gz | tar xz -C /usr/local --strip-components=1
+
+  install_node_script: |
+    export DISTRO="$(awk -F= '$1 == "VERSION_CODENAME" { print $2 }' /etc/os-release)"
+    curl --silent https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add -
+    echo "deb https://deb.nodesource.com/${NODE_VERSION} ${DISTRO} main" > /etc/apt/sources.list.d/nodesource.list
+    apt-get update
+    apt-get install --yes nodejs
+    node --version && npm --version
+
+  node_modules_cache:
+    folder: node_modules
+    fingerprint_script: echo $CIRRUS_OS ; cat package-lock.json
+    populate_script: npm ci
+
+  post_install_script: node scripts/postinstall.mjs
+
+  do_build_script: npm run build
+
+  build_artifacts:
+    name: build
+    path: dist/*.zip
+
+upgrade_task:
+  name: Upgrade E2E Tests
+  trigger_type: manual
+  depends_on: [ build ]
+  timeout_in: 60
+  container:
+    image: 'ubuntu:20.04'
+    kvm: 'true'
+    cpu: 8
+    memory: 8G
+  env:
+    DEBIAN_FRONTEND: noninteractive
+    NODE_VERSION: node_16.x
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    SUDO_NON_ROOT_CMD: >
+      sudo --preserve-env --user=ranchertest
+      /usr/bin/env --chdir=/home/ranchertest/src
+      HOME=/home/ranchertest
+
+  # Sett up a non-root user
+  prepare_user_script:
+    - groupadd --gid $(stat -c '%g' /dev/kvm) kvm
+    - useradd --create-home --groups kvm ranchertest
+    - mkdir /home/ranchertest/src
+    - tar c --owner=ranchertest . | tar x --directory=/home/ranchertest/src
+    - chown -R ranchertest:ranchertest /home/ranchertest
+
+  install_deps_script: >
+    apt-get update && apt-get install --yes --no-install-recommends
+    ca-certificates
+    curl
+    gnupg
+    sudo
+    unzip
+    libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 libnss3
+    libxss1 libasound2 libxtst6 openssh-client xauth xvfb
+
+  install_node_script: |
+    export DISTRO="$(awk -F= '$1 == "VERSION_CODENAME" { print $2 }' /etc/os-release)"
+    curl --silent https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add -
+    echo "deb https://deb.nodesource.com/${NODE_VERSION} ${DISTRO} main" > /etc/apt/sources.list.d/nodesource.list
+    apt-get update
+    apt-get install --yes nodejs
+    node --version && npm --version
+
+  node_modules_cache:
+    folder: /home/ranchertest/src/node_modules
+    fingerprint_script: echo $CIRRUS_OS ; cat package-lock.json
+    populate_script:
+    - ${SUDO_NON_ROOT_CMD} npm ci
+    - ${SUDO_NON_ROOT_CMD} ./node_modules/.bin/playwright install-deps
+
+  test_script:
+    # Download the old build
+    - ${SUDO_NON_ROOT_CMD} mkdir -p /home/ranchertest/old /home/ranchertest/new
+    - >
+      ${SUDO_NON_ROOT_CMD} curl --location --output "/home/ranchertest/old.zip"
+      https://github.com/rancher-sandbox/rancher-desktop/releases/download/v1.0.1/rancher-desktop-linux-v1.0.1.zip
+    - >
+      ${SUDO_NON_ROOT_CMD} curl --location --output "/home/ranchertest/new-wrapped.zip"
+      https://api.cirrus-ci.com/v1/artifact/build/${CIRRUS_BUILD_ID}/build/build.zip
+    - ${SUDO_NON_ROOT_CMD} unzip -d /home/ranchertest/old /home/ranchertest/old.zip
+    - ${SUDO_NON_ROOT_CMD} unzip -d /home/ranchertest/ /home/ranchertest/new-wrapped.zip
+    - ${SUDO_NON_ROOT_CMD} unzip -d /home/ranchertest/new /home/ranchertest/dist/*.zip
+      # work around kuberlr error https://github.com/flavio/kuberlr/issues/22
+    - ${SUDO_NON_ROOT_CMD} /home/ranchertest/old/resources/resources/linux/bin/kuberlr get 1.23.4 || true
+    - >
+      ${SUDO_NON_ROOT_CMD} KUBECONFIG=/home/ranchertest/.kube/config
+      OLD_DIR=/home/ranchertest/old NEW_DIR=/home/ranchertest/new
+      xvfb-run --auto-servernum --
+      node_modules/.bin/playwright test --config=e2e/config/playwright-config.ts
+      -- ./e2e/upgrade.e2e.spec.manual.ts
+
+  on_failure:
+    # custom_script workaround for cirrus bug: https://github.com/cirruslabs/cirrus-ci-agent/issues/197
+    # Still broken after cirrus fix, addressing a new issue to them. (Jan.06 2022)
+    copy_playwright_script: |
+      mkdir /tmp/cirrus-ci-build/e2e/reports/
+      cp --dereference --recursive /home/ranchertest/src/e2e/reports/* /tmp/cirrus-ci-build/e2e/reports/
+    playwright_artifacts:
+      path: "/tmp/cirrus-ci-build/e2e/reports/*"
+    copy_logs_script: |
+      mkdir -p /tmp/cirrus-ci-build/e2e/logs/
+      cp --dereference --recursive /home/ranchertest/.local/share/rancher-desktop/logs/* /tmp/cirrus-ci-build/e2e/logs/
+    logs_artifacts:
+      path: "/tmp/cirrus-ci-build/e2e/logs/*"

@@ -62,18 +62,21 @@ export async function tearDownHelm() {
 /**
  * Run the given tool with the given arguments, returning its standard output.
  */
-export async function tool(tool: string, ...args: string[]): Promise<string> {
-  const srcDir = path.dirname(__dirname);
-  const filename = os.platform().startsWith('win') ? `${ tool }.exe` : tool;
-  const exe = path.join(srcDir, '..', 'resources', os.platform(), 'bin', filename);
+export async function tool(options: {tool: string, appDir?: string}, ...args: string[]): Promise<string> {
+  const packagedPath = os.platform() === 'darwin' ? ['Contents', 'Resources'] : ['resources'];
+  const appDir = options.appDir ? path.join(options.appDir, ...packagedPath) : path.join(path.dirname(__dirname), '..');
+  const filename = os.platform().startsWith('win') ? `${ options.tool }.exe` : options.tool;
+  const exe = path.join(appDir, 'resources', os.platform(), 'bin', filename);
 
   try {
-    const { stdout } = await childProcess.spawnFile(
-      exe, args, { stdio: ['ignore', 'pipe', 'inherit'] });
+    console.log(`Running ${ exe } ${ args.join(' ') }...`);
+    const { stdout, stderr } = await childProcess.spawnFile(exe, args, { stdio: 'pipe' });
+
+    console.log(stderr);
 
     return stdout;
   } catch (ex:any) {
-    console.error(`Error running ${ tool } ${ args.join(' ') }`);
+    console.error(`Error running ${ options.tool } ${ args.join(' ') }`, ex);
     console.error(`stdout: ${ ex.stdout }`);
     console.error(`stderr: ${ ex.stderr }`);
     throw ex;
@@ -85,8 +88,18 @@ export async function tool(tool: string, ...args: string[]): Promise<string> {
  * @returns standard output of the command.
  * @example await kubectl('version')
  */
-export async function kubectl(...args: string[] ): Promise<string> {
-  return await tool('kubectl', '--context', 'rancher-desktop', ...args);
+export async function kubectl(options: {appDir?: string}, ...args: string[]): Promise<string>;
+export async function kubectl(...args: string[]): Promise<string>;
+export async function kubectl(optionOrArg: {appDir?: string} | string, ...args: string[] ): Promise<string> {
+  const options: {tool: string, appDir?: string} = { tool: 'kubectl' };
+
+  if (typeof optionOrArg === 'string') {
+    args.unshift(optionOrArg);
+  } else {
+    Object.assign(options, optionOrArg);
+  }
+
+  return await tool(options, '--context', 'rancher-desktop', ...args);
 }
 
 /**
@@ -94,6 +107,16 @@ export async function kubectl(...args: string[] ): Promise<string> {
  * @returns standard output of the command.
  * @example await helm('version')
  */
-export async function helm(...args: string[] ): Promise<string> {
-  return await tool('helm', '--kube-context', 'rancher-desktop', ...args);
+export async function helm(options: {appDir?: string}, ...args: string[]): Promise<string>;
+export async function helm(...args: string[]): Promise<string>;
+export async function helm(optionOrArg: {appDir?: string} | string, ...args: string[] ): Promise<string> {
+  const options: {tool: string, appDir?: string} = { tool: 'helm' };
+
+  if (typeof optionOrArg === 'string') {
+    args.unshift(optionOrArg);
+  } else {
+    Object.assign(options, optionOrArg);
+  }
+
+  return await tool(options, '--kube-context', 'rancher-desktop', ...args);
 }
