@@ -18,16 +18,21 @@ jobs:
   package:
     strategy:
       matrix:
-        os: [macos-intel, macos-arm, windows, linux]
         include:
         - os: macos-intel
           runs-on: macos-11
+          platform: mac
+          arch: x86_64
         - os: macos-arm
           runs-on: macos-11
+          platform: mac
+          arch: aarch64
         - os: windows
           runs-on: windows-2019
+          platform: win
         - os: linux
           runs-on: ubuntu-latest
+          platform: linux
     runs-on: ${{ matrix.runs-on }}
     steps:
     - uses: actions/checkout@v3
@@ -54,85 +59,39 @@ jobs:
           sudo apt-get update
           sudo apt-get install flatpak flatpak-builder
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    - name: Flag build for M1
+      if: matrix.arch == 'aarch64' && matrix.platform == 'mac'
+      run: echo "M1=1" >> "${GITHUB_ENV}"
     - name: npm ci
-      if: matrix.os != 'macos-arm'
       run: npm ci
-    - name: npm ci (for M1)
-      if: matrix.os == 'macos-arm'
-      run: M1=1 npm ci
-    - name: npm run build
-      run: |
-        case "${{ matrix.os }}" in
-          macos-intel)
-            # Build Intel version with Intel assets
-            npm run build -- --mac --publish=never
-            ;;
-          macos-arm)
-            # Build Intel version with M1 assets
-            M1=1 npm run build -- --mac --publish=never
-            ;;
-          windows)
-            npm run build -- --win --publish=never
-            ;;
-          linux)
-            npm run build -- --linux --publish=never
-            ;;
-        esac
-    - uses: actions/upload-artifact@v3
-      if: matrix.os == 'macos-intel'
+    - run: npm run build -- --${{ matrix.platform }} --publish=never
+    - name: Upload mac disk image
+      uses: actions/upload-artifact@v3
+      if: matrix.platform == 'mac'
       with:
-        name: Rancher Desktop.x86_64.dmg
+        name: Rancher Desktop.${{ matrix.arch }}.dmg
         path: dist/Rancher Desktop*.dmg
         if-no-files-found: error
-    - uses: actions/upload-artifact@v3
-      if: matrix.os == 'macos-intel'
+    - name: Upload mac zip
+      uses: actions/upload-artifact@v3
+      if: matrix.platform == 'mac'
       with:
-        name: Rancher Desktop-mac.x86_64.zip
+        name: Rancher Desktop-mac.${{ matrix.arch }}.zip
         path: dist/Rancher Desktop*.zip
         if-no-files-found: error
-    - uses: actions/upload-artifact@v3
-      if: matrix.os == 'macos-arm'
-      with:
-        name: Rancher Desktop.aarch64.dmg
-        path: dist/Rancher Desktop*.dmg
-        if-no-files-found: error
-    - uses: actions/upload-artifact@v3
-      if: matrix.os == 'macos-arm'
-      with:
-        name: Rancher Desktop-mac.aarch64.zip
-        path: dist/Rancher Desktop*.zip
-        if-no-files-found: error
-    - uses: actions/upload-artifact@v3
-      if: matrix.os == 'windows'
+    - name: Upload Windows installer
+      uses: actions/upload-artifact@v3
+      if: matrix.platform == 'win'
       with:
         name: Rancher Desktop Setup.exe
         path: dist/Rancher Desktop*.exe
         if-no-files-found: error
-    - uses: actions/upload-artifact@v3
-      if: matrix.os == 'windows'
-      with:
-        name: Rancher Desktop-win.zip
-        path: dist/Rancher Desktop-*-win.zip
-        if-no-files-found: error
-    - name: set zip_name env var
-      run: |
-        # in pull requests GITHUB_REF_NAME is in the form "<pr_number>/merge";
-        # remove slashes since they aren't valid in filenames
-        no_slash_ref_name=$(echo $GITHUB_REF_NAME | sed -E 's/\//-/g')
-        zip_name="rancher-desktop-linux-${no_slash_ref_name}.zip"
-        echo "zip_name=$zip_name" >> $GITHUB_ENV
-    - name: Ensure linux zip file has a known name
-      uses: canastro/copy-file-action@0.0.2
-      if: matrix.os == 'linux'
-      with:
-        source: "dist/rancher-desktop*.zip"
-        target: ${{ format('dist/{0}', env.zip_name) }}
-    - name: Upload zip as workflow artifact
+    - name: Upload non-mac zip
       uses: actions/upload-artifact@v3
-      if: matrix.os == 'linux'
+      if: matrix.platform != 'mac'
       with:
-        name: Rancher Desktop-linux.zip
-        path: ${{ format('dist/{0}', env.zip_name) }}
+        name: Rancher Desktop-${{ matrix.platform }}.zip
+        path: dist/Rancher Desktop-*-${{ matrix.platform }}.zip
         if-no-files-found: error
     - id: has_s3
       name: Check if S3 secrets are available
@@ -141,14 +100,23 @@ jobs:
       run: '[[ -n "${key}" ]]'
       env:
         key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    - name: set zip_name env var
+      id: zip_name
+      if: matrix.platform == 'linux'
+      run: |
+        # in pull requests GITHUB_REF_NAME is in the form "<pr_number>/merge";
+        # remove slashes since they aren't valid in filenames
+        no_slash_ref_name="${GITHUB_REF_NAME//\//-/}"
+        zip_name="rancher-desktop-linux-${no_slash_ref_name}.zip"
+        echo "::set-output name=zip_name::${zip_name}"
     - name: Copy zip file to S3
-      uses: prewk/s3-cp-action@v2
+      uses: prewk/s3-cp-action@74701625561055a306f92fa5c18e948f9d14a54a
       if: steps.has_s3.outcome == 'success'
       with:
         aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        source: ${{ format('./dist/{0}', env.zip_name) }}
-        dest: ${{ format('s3://rancher-desktop-assets-for-obs/{0}', env.zip_name) }}
+        source: dist/Rancher-Desktop-*-${{ matrix.platform }}.zip
+        dest: s3://rancher-desktop-assets-for-obs/${{ steps.zip_name.outputs.zip_name }}
     - name: Trigger OBS services for relevant package in dev channel
       if: steps.has_s3.outcome == 'success'
       run: |
