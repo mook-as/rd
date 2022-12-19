@@ -5,13 +5,13 @@ import util from 'util';
 
 import semver from 'semver';
 
-import { KubeClient } from '../client';
-import K3sHelper, { ExtraRequiresReasons, NoCachedK3sVersionsError, ShortVersion } from '../k3sHelper';
 import WSLBackend, { Action } from '../wsl';
 
 import INSTALL_K3S_SCRIPT from '@pkg/assets/scripts/install-k3s';
 import { BackendSettings, RestartReasons } from '@pkg/backend/backend';
+import K3sHelper, { ExtraRequiresReasons, NoCachedK3sVersionsError, ShortVersion } from '@pkg/backend/k3sHelper';
 import * as K8s from '@pkg/backend/k8s';
+import { KubeClient } from '@pkg/backend/kubeclient';
 import { ContainerEngine } from '@pkg/config/settings';
 import mainEvents from '@pkg/main/mainEvents';
 import { checkConnectivity } from '@pkg/main/networking';

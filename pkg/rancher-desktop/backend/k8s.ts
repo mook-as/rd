@@ -1,17 +1,18 @@
 import semver from 'semver';
 
 import { BackendSettings, RestartReasons } from './backend';
-import { ServiceEntry } from './client';
 import { ExtraRequiresReasons } from './k3sHelper';
 
 import EventEmitter from '@pkg/utils/eventEmitter';
 import { RecursivePartial } from '@pkg/utils/typeUtils';
 
+import type { ServiceEntry } from './kubeclient';
+
 export { State, BackendError as KubernetesError } from './backend';
 export type {
   BackendSettings, FailureDetails, RestartReasons, BackendProgress as KubernetesProgress,
 } from './backend';
-export type { ServiceEntry } from './client';
+export type { ServiceEntry } from './kubeclient';
 
 /**
  * VersionEntry describes a version of K3s.
