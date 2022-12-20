@@ -136,6 +136,10 @@ export default class MockBackend extends events.EventEmitter implements VMExecut
     return Promise.resolve();
   }
 
+  readFile(filePath: string, options: { encoding?: BufferEncoding } = {}): Promise<string> {
+    return Promise.resolve('');
+  }
+
   // #endregion
 
   // #region Events

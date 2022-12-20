@@ -216,6 +216,16 @@ export interface VMExecutor {
   spawn(options: execOptions, ...command: string[]): childProcess.ChildProcess;
 
   /**
+   * Read the contents of the given file.
+   * @param filePath The path inside the VM to read.
+   * @param [options.encoding='utf-8'] The encoding of the file.
+   * @param [options.resolveSymlinks=true] Whether to resolve symlinks before reading.
+   * @returns The contents of the file.
+   */
+  readFile(filePath: string): Promise<string>;
+  readFile(filePath: string, options: Partial<{ encoding: BufferEncoding, resolveSymlinks: true }>): Promise<string>;
+
+  /**
    * Write the given contents to a given file name in the VM.
    * The file will be owned by root.
    * @param filePath The destination file path, in the VM.

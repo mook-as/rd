@@ -751,8 +751,15 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
    * Run the given command within the VM.
    */
   limaSpawn(options: execOptions, args: string[]): ChildProcess {
+    if (options.root) {
+      args = ['sudo'].concat(args);
+    }
     args = ['shell', '--workdir=.', MACHINE_NAME].concat(args);
     args = this.debug ? ['--debug'].concat(args) : args;
+
+    if (this.debug) {
+      console.log(`> limactl ${ args.join(' ') }`);
+    }
 
     return spawnWithSignal(
       LimaBackend.limactl,
@@ -784,9 +791,15 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
       if (options.capture) {
         return stdout;
       }
-    } catch (ex) {
+    } catch (ex: any) {
       if (!expectFailure) {
         console.log(`Lima: executing: ${ command.join(' ') }: ${ ex }`);
+        if ('stdout' in ex) {
+          console.error(ex.stdout);
+        }
+        if ('stderr' in ex) {
+          console.error(ex.stderr);
+        }
       }
       throw ex;
     }
@@ -1380,6 +1393,54 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
       console.log(`Error trying to start/update containerd: ${ err }: `, err);
     } finally {
       await fs.promises.rm(workdir, { recursive: true });
+    }
+  }
+
+  async readFile(filePath: string, options?: { encoding?: BufferEncoding }): Promise<string> {
+    const encoding = options?.encoding ?? 'utf-8';
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+
+    try {
+      // Use limaSpawn to avoid logging file contents (too verbose).
+      const proc = this.limaSpawn({ root: true }, ['/bin/cat', filePath]);
+
+      await new Promise<void>((resolve, reject) => {
+        proc.stdout?.on('data', (chunk: Buffer | string) => {
+          if (chunk instanceof Buffer) {
+            stdout.push(chunk);
+          } else {
+            stdout.push(Buffer.from(chunk));
+          }
+        });
+        proc.stderr?.on('data', (chunk: Buffer | string) => {
+          if (chunk instanceof Buffer) {
+            stderr.push(chunk);
+          } else {
+            stderr.push(Buffer.from(chunk));
+          }
+        });
+        proc.on('error', (err) => {
+          reject(err);
+        });
+        proc.on('exit', (code, signal) => {
+          if (code || signal) {
+            return reject(`Failed to read ${ filePath }: cat exited with ${ code || signal }`);
+          }
+          resolve();
+        });
+      });
+
+      return Buffer.concat(stdout).toString(encoding);
+    } catch (ex: any) {
+      console.error(`Failed to read file ${ filePath }:`, ex);
+      if (stderr.length) {
+        console.error(Buffer.concat(stderr).toString('utf-8'));
+      }
+      if (stdout.length) {
+        console.error(Buffer.concat(stdout).toString('utf-8'));
+      }
+      throw ex;
     }
   }
 
