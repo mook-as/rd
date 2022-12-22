@@ -8,6 +8,7 @@ import semver from 'semver';
 import {
   BackendSettings, execOptions, State, RestartReasons, VMExecutor, BackendEvents,
 } from './backend';
+import { ContainerEngineClient } from './containerEngine';
 import { KubernetesBackend, KubernetesError, KubernetesBackendEvents } from './k8s';
 import ProgressTracker from './progressTracker';
 
@@ -36,6 +37,10 @@ export default class MockBackend extends events.EventEmitter implements VMExecut
 
   getBackendInvalidReason(): Promise<KubernetesError | null> {
     return Promise.resolve(null);
+  }
+
+  get containerEngineClient(): ContainerEngineClient {
+    throw new Error('not implemented');
   }
 
   protected setState(state: State) {
@@ -140,6 +145,9 @@ export default class MockBackend extends events.EventEmitter implements VMExecut
     return Promise.resolve('');
   }
 
+  copyFileOut(vmPath: string, hostPath: string): Promise<void> {
+    return Promise.resolve();
+  }
   // #endregion
 
   // #region Events

@@ -94,6 +94,8 @@ export const defaultSettings = {
   startInBackground:    false,
   hideNotificationIcon: false,
   window:               { quitOnClose: false },
+  /** UI extensions; the key is an image ID. */
+  extensions:           {} as Record<string, boolean>,
 };
 
 export type Settings = typeof defaultSettings;
@@ -262,7 +264,7 @@ export function updateFromCommandLine(cfg: Settings, commandLineArgs: string[]):
         throw new Error(`Can't evaluate --${ fqFieldName }=${ finalValue } as ${ currentValueType }: ${ err }`);
       }
       // We know the current value's type is either boolean or number, so a constrained comparison is ok
-      // eslint-disable-next-line valid-typeof
+      // eslint-disable-next-line valid-typeof -- currentValueType is a computed type name.
       if (typeof finalValue !== currentValueType) {
         throw new TypeError(`Type of '${ finalValue }' is ${ typeof finalValue }, but current type of ${ fqFieldName } is ${ currentValueType } `);
       }

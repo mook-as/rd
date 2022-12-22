@@ -11,27 +11,29 @@ const APP_NAME = 'rancher-desktop';
 
 export interface Paths {
   /** appHome: the location of the main appdata directory. */
-  appHome: string;
+  readonly appHome: string;
   /** altAppHome is a secondary directory for application data. */
-  altAppHome: string;
+  readonly altAppHome: string;
   /** Directory which holds configuration. */
-  config: string;
+  readonly config: string;
   /** Directory which holds logs. */
-  logs: string;
+  readonly logs: string;
   /** Directory which holds caches that may be removed. */
-  cache: string;
+  readonly cache: string;
   /** Directory holding the WSL distribution (Windows-specific). */
-  wslDistro: string;
+  readonly wslDistro: string;
   /** Directory holding the WSL data distribution (Windows-specific). */
-  wslDistroData: string;
+  readonly wslDistroData: string;
   /** Directory holding Lima state (macOS-specific). */
-  lima: string;
+  readonly lima: string;
   /** Directory holding provided binary resources */
-  integration: string;
+  readonly integration: string;
   /** The directory that used to hold provided binary integrations */
-  oldIntegration: string;
+  readonly oldIntegration: string;
   /** Directory that holds resource files in the RD installation. */
-  resources: string;
+  readonly resources: string;
+  /** Directory that will hold installed extension resources */
+  readonly extensionRoot: string;
 }
 
 /**
@@ -49,14 +51,15 @@ class ProvidesResources {
  * DarwinPaths implements paths for Darwin / macOS.
  */
 export class DarwinPaths extends ProvidesResources implements Paths {
-  appHome = path.join(os.homedir(), 'Library', 'Application Support', APP_NAME);
-  altAppHome = path.join(os.homedir(), '.rd');
-  config = path.join(os.homedir(), 'Library', 'Preferences', APP_NAME);
-  logs = process.env.RD_LOGS_DIR ?? path.join(os.homedir(), 'Library', 'Logs', APP_NAME);
-  cache = path.join(os.homedir(), 'Library', 'Caches', APP_NAME);
-  lima = path.join(this.appHome, 'lima');
-  oldIntegration = '/usr/local/bin';
-  integration = path.join(this.altAppHome, 'bin');
+  readonly appHome = path.join(os.homedir(), 'Library', 'Application Support', APP_NAME);
+  readonly altAppHome = path.join(os.homedir(), '.rd');
+  readonly config = path.join(os.homedir(), 'Library', 'Preferences', APP_NAME);
+  readonly logs = process.env.RD_LOGS_DIR ?? path.join(os.homedir(), 'Library', 'Logs', APP_NAME);
+  readonly cache = path.join(os.homedir(), 'Library', 'Caches', APP_NAME);
+  readonly lima = path.join(this.appHome, 'lima');
+  readonly oldIntegration = '/usr/local/bin';
+  readonly integration = path.join(this.altAppHome, 'bin');
+  readonly extensionRoot = path.join(this.appHome, 'extensions');
 
   get wslDistro(): string {
     throw new Error('wslDistro not available for darwin');
@@ -81,6 +84,7 @@ export class Win32Paths extends ProvidesResources implements Paths {
   readonly cache = path.join(this.localAppData, APP_NAME, 'cache');
   readonly wslDistro = path.join(this.localAppData, APP_NAME, 'distro');
   readonly wslDistroData = path.join(this.localAppData, APP_NAME, 'distro-data');
+  readonly extensionRoot = path.join(this.localAppData, APP_NAME, 'extensions');
 
   get lima(): string {
     throw new Error('lima not available for Windows');
@@ -110,6 +114,7 @@ export class LinuxPaths extends ProvidesResources implements Paths {
   readonly lima = path.join(this.dataHome, APP_NAME, 'lima');
   readonly integration = path.join(this.altAppHome, 'bin');
   readonly oldIntegration = path.join(os.homedir(), '.local', 'bin');
+  readonly extensionRoot = path.join(this.dataHome, APP_NAME, 'extensions');
 
   get wslDistro(): string {
     throw new Error('wslDistro not available for Linux');

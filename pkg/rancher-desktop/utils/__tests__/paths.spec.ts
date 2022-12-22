@@ -78,6 +78,11 @@ describe('paths', () => {
       linux:  RESOURCES_PATH,
       darwin: RESOURCES_PATH,
     },
+    extensionRoot: {
+      win32:  '%LOCALAPPDATA%/rancher-desktop/extensions',
+      linux:  '%HOME%/.local/share/rancher-desktop/extensions',
+      darwin: '%HOME%/Library/Application Support/rancher-desktop/extensions',
+    },
   };
 
   const table = Object.entries(cases).flatMap(

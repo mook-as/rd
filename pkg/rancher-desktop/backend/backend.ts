@@ -1,6 +1,8 @@
 import fs from 'fs';
 import stream from 'stream';
 
+import { ContainerEngineClient } from './containerEngine';
+
 import { Settings } from '@pkg/config/settings';
 import * as childProcess from '@pkg/utils/childProcess';
 import EventEmitter from '@pkg/utils/eventEmitter';
@@ -175,6 +177,7 @@ export interface VMBackend extends EventEmitter<BackendEvents> {
 
   readonly executor: VMExecutor;
   readonly kubeBackend: KubernetesBackend;
+  readonly containerEngineClient: ContainerEngineClient;
 }
 
 /**
@@ -234,4 +237,12 @@ export interface VMExecutor {
    */
   writeFile(filePath: string, fileContents: string): Promise<void>;
   writeFile(filePath: string, fileContents: string, permissions: fs.Mode): Promise<void>;
+
+  /**
+   * Copy the given file from the VM into the host.
+   * @param vmPath The source path, inside the VM.
+   * @param hostPath The destination path, inside the host.
+   * @note The behaviour of copying a directory is undefined.
+   */
+  copyFileOut(vmPath: string, hostPath: string): Promise<void>;
 }

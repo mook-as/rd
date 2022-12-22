@@ -64,6 +64,11 @@ export interface IpcMainEvents {
   'preferences-set-dirty': (isDirty: boolean) => void;
   // #endregion
 
+  // #region extensions
+  /** Terminate the given process spawned via `extension/spawn`. */
+  'extension/spawn/kill': (id: string) => void;
+  // #endregion
+
   'show-logs': () => void;
 
   /** @deprecated */
@@ -98,6 +103,11 @@ export interface IpcMainInvokeEvents {
   // #region main/imageEvents
   'images-mounted': (mounted: boolean) => {imageName: string, tag: string, imageID: string, size: string}[];
   'images-check-state': () => boolean;
+  // #endregion
+
+  // #region extensions
+  /** Execute the given command. Output and events are reported via `extension/spawn/*` */
+  'extension/spawn': (command: string[], options: { id: string, scope: 'host' | 'vm', cwd?: string, env?: Record<string, string | undefined> }) => void;
   // #endregion
 }
 
@@ -142,5 +152,18 @@ export interface IpcRendererEvents {
 
   // #region api
   'api-credentials': (credentials: {user: string, password: string, port: number}) => void;
+  // #endregion
+
+  // #region extensions
+  /** Output is available for a command spawned from `extension/spawn`. */
+  'extension/spawn/output': (id: string, data: { stdout?: string, stderr?: string }) => void;
+  /**
+   * The given process from `extension/spawn` has an error.
+   * @param returnValue The process exit value, either a signal, an exit code,
+   *   or an exception.
+   */
+  'extension/spawn/error': (id: string, error: NodeJS.Signals | number | object) => void;
+  /** The given process from `extension/spawn` has exited. */
+  'extension/spawn/close': (id: string, exitCode: number) => void;
   // #endregion
 }

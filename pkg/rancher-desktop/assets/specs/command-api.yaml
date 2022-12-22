@@ -353,6 +353,9 @@ components:
           properties:
             quitOnClose:
               type: boolean
+        extensions:
+          type: object
+          additionalProperties: { type: boolean }
 
     diagnostics:
       type: object

@@ -22,8 +22,11 @@ import {
   Architecture, BackendError, BackendEvents, BackendProgress, BackendSettings, execOptions, FailureDetails, RestartReasons, State, VMBackend, VMExecutor,
 } from './backend';
 import BackendHelper from './backendHelper';
+import { ContainerEngineClient } from './containerEngine';
 import K3sHelper from './k3sHelper';
 import * as K8s from './k8s';
+import MobyClient from './mobyClient';
+import NerdctlClient from './nerdctlClient';
 import ProgressTracker, { getProgressErrorDescription } from './progressTracker';
 
 import DEPENDENCY_VERSIONS from '@pkg/assets/dependencies.yaml';
@@ -49,6 +52,8 @@ import paths from '@pkg/utils/paths';
 import { jsonStringifyWithWhiteSpace } from '@pkg/utils/stringify';
 import { defined, RecursivePartial } from '@pkg/utils/typeUtils';
 import { openSudoPrompt } from '@pkg/window';
+
+/* eslint @typescript-eslint/switch-exhaustiveness-check: "error" */
 
 /**
  * Enumeration for tracking what operation the backend is undergoing.
@@ -262,6 +267,14 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
 
   readonly kubeBackend: K8s.KubernetesBackend;
   readonly executor = this;
+  #containerEngineClient: ContainerEngineClient | undefined;
+
+  get containerEngineClient() {
+    if (this.#containerEngineClient) {
+      return this.#containerEngineClient;
+    }
+    throw new Error('Invalid state, no container engine client available.');
+  }
 
   protected readonly CONFIG_PATH = path.join(paths.lima, '_config', `${ MACHINE_NAME }.yaml`);
 
@@ -321,6 +334,10 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
     case State.ERROR:
     case State.DISABLED:
       await this.kubeBackend.cleanup();
+      break;
+    case State.STARTING:
+    case State.STARTED:
+      /* nothing */
     }
   }
 
@@ -721,14 +738,20 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
    */
   protected async limaWithCapture(this: Readonly<this>, ...args: string[]): Promise<string>;
   protected async limaWithCapture(this: Readonly<this>, expectFailure: true, ...args: string[]): Promise<string>;
-  protected async limaWithCapture(this: Readonly<this>, argOrExpectFailure: true | string, ...args: string[]): Promise<string> {
+  protected async limaWithCapture(this: Readonly<this>, options: { expectFailure?: true }, ...args: string[]): Promise<string>;
+  protected async limaWithCapture(this: Readonly<this>, options: { expectFailure?: true, stderr: true }, ...args: string[]): Promise<{ stdout: string, stderr: string }>;
+  protected async limaWithCapture(this: Readonly<this>, argOrOptions: true | string | { expectFailure?: true, stderr?: true }, ...args: string[]): Promise<string | { stdout: string, stderr: string }> {
     let expectFailure = false;
+    let captureStderr = false;
 
-    if (typeof argOrExpectFailure === 'boolean') {
+    if (typeof argOrOptions === 'boolean') {
       expectFailure = true;
-    } else {
-      args = [argOrExpectFailure].concat(args);
+    } else if (typeof argOrOptions === 'string') {
+      args = [argOrOptions].concat(args);
       expectFailure = false;
+    } else {
+      expectFailure = argOrOptions.expectFailure ?? false;
+      captureStderr = argOrOptions.stderr ?? false;
     }
     args = this.debug ? ['--debug'].concat(args) : args;
     try {
@@ -738,10 +761,20 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
 
       console.log(`> limactl ${ args.join(' ') }${ formatBreak }${ stderr }${ stdout }`);
 
+      if (captureStderr) {
+        return { stdout, stderr };
+      }
+
       return stdout;
-    } catch (ex) {
+    } catch (ex: any) {
       if (!expectFailure) {
         console.error(`> limactl ${ args.join(' ') }\n$`, ex);
+        if ('stdout' in ex) {
+          console.error(ex.stdout);
+        }
+        if ('stderr' in ex) {
+          console.error(ex.stderr);
+        }
       }
       throw ex;
     }
@@ -1468,6 +1501,10 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
     }
   }
 
+  async copyFileOut(vmPath: string, hostPath: string): Promise<void> {
+    await this.lima('copy', `${ MACHINE_NAME }:${ vmPath }`, hostPath);
+  }
+
   /**
    * Get IPv4 address for specified interface.
    */
@@ -1647,6 +1684,7 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
     await this.setState(State.STARTING);
     this.currentAction = Action.STARTING;
     this.#adminAccess = config_.application.adminAccess ?? true;
+    this.#containerEngineClient = undefined;
     await this.progressTracker.action('Starting Backend', 10, async() => {
       try {
         await this.ensureArchitectureMatch();
@@ -1711,10 +1749,15 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
         if (config.containerEngine.imageAllowList.enabled) {
           await this.startService('openresty');
         }
-        if (config.containerEngine.name === ContainerEngine.CONTAINERD) {
+        switch (config.containerEngine.name) {
+        case ContainerEngine.CONTAINERD:
           await this.startService('containerd');
-        } else if (config.containerEngine.name === ContainerEngine.MOBY) {
+          break;
+        case ContainerEngine.MOBY:
           await this.startService('docker');
+          break;
+        case ContainerEngine.NONE:
+          throw new Error(`No container engine is set`);
         }
         if (kubernetesVersion) {
           await this.kubeBackend.install(config, kubernetesVersion, this.#adminAccess);
@@ -1743,13 +1786,18 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
           k3sEndpoint = await this.kubeBackend.start(config, kubernetesVersion);
         }
 
-        if (config.containerEngine.name === ContainerEngine.MOBY) {
+        switch (config.containerEngine.name) {
+        case ContainerEngine.MOBY:
           await this.dockerDirManager.ensureDockerContextConfigured(
             this.#adminAccess,
             path.join(paths.altAppHome, 'docker.sock'),
             k3sEndpoint);
-        } else if (config.containerEngine.name === ContainerEngine.CONTAINERD) {
+          this.#containerEngineClient = new MobyClient(this, path.join(paths.altAppHome, 'docker.sock'));
+          break;
+        case ContainerEngine.CONTAINERD:
           await this.execCommand({ root: true }, '/sbin/rc-service', '--ifnotstarted', 'buildkitd', 'start');
+          this.#containerEngineClient = new NerdctlClient(this);
+          break;
         }
 
         await this.setState(config.kubernetes.enabled ? State.STARTED : State.DISABLED);
@@ -1887,6 +1935,7 @@ CREDFWD_URL='http://${ hostIPAddr }:${ stateInfo.port }'
       return;
     }
     this.currentAction = Action.STOPPING;
+    this.#containerEngineClient = undefined;
 
     await this.progressTracker.action('Stopping services', 10, async() => {
       try {

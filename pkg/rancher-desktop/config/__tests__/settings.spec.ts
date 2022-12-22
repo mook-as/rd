@@ -59,6 +59,7 @@ describe('updateFromCommandLine', () => {
       startInBackground:    false,
       hideNotificationIcon: false,
       window:               { quitOnClose: false },
+      extensions:           {},
     };
     origPrefs = clone(prefs);
   });

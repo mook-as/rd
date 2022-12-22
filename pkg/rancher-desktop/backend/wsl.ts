@@ -15,7 +15,10 @@ import {
   BackendError, BackendEvents, BackendProgress, BackendSettings, execOptions, FailureDetails, RestartReasons, State, VMBackend, VMExecutor,
 } from './backend';
 import BackendHelper from './backendHelper';
+import { ContainerEngineClient } from './containerEngine';
 import K3sHelper from './k3sHelper';
+import MobyClient from './mobyClient';
+import NerdctlClient from './nerdctlClient';
 import ProgressTracker, { getProgressErrorDescription } from './progressTracker';
 
 import DEPENDENCY_VERSIONS from '@pkg/assets/dependencies.yaml';
@@ -149,6 +152,14 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
 
   readonly kubeBackend: KubernetesBackend;
   readonly executor = this;
+  #containerEngineClient: ContainerEngineClient | undefined;
+
+  get containerEngineClient() {
+    if (this.#containerEngineClient) {
+      return this.#containerEngineClient;
+    }
+    throw new Error('Invalid state, no container engine client available.');
+  }
 
   /** Not used in wsl.ts */
   get noModalDialogs() {
@@ -572,7 +583,7 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
   /**
    * Read the given file in a WSL distribution
    * @param [filePath] the path of the file to read.
-   * @param [options] Optional configuratino for reading the file.
+   * @param [options] Optional configuration for reading the file.
    * @param [options.distro=INSTANCE_NAME] The distribution to read from.
    * @param [options.encoding='utf-8'] The encoding to use for the result.
    * @param [options.resolveSymlinks=true] Whether to resolve symlinks before reading.
@@ -580,7 +591,7 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
   async readFile(filePath: string, options?: Partial<{
     distro: typeof INSTANCE_NAME | typeof DATA_INSTANCE_NAME,
     encoding: BufferEncoding,
-    resolveSymlinks: true,
+    resolveSymlinks: boolean,
   }>) {
     const distro = options?.distro ?? INSTANCE_NAME;
     const encoding = options?.encoding ?? 'utf-8';
@@ -628,6 +639,12 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
    */
   async writeFile(filePath: string, fileContents: string, permissions: fs.Mode = 0o644) {
     await this.writeFileWSL(filePath, fileContents, { permissions });
+  }
+
+  async copyFileOut(vmPath: string, hostPath: string): Promise<void> {
+    const wslPath = await this.wslify(vmPath);
+
+    await fs.promises.copyFile(wslPath, hostPath);
   }
 
   /**
@@ -1084,6 +1101,7 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
 
     await this.setState(State.STARTING);
     this.currentAction = Action.STARTING;
+    this.#containerEngineClient = undefined;
     await this.progressTracker.action('Initializing Rancher Desktop', 10, async() => {
       try {
         const prepActions = [(async() => {
@@ -1258,6 +1276,11 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
             this.execCommand('/usr/local/bin/wsl-service', '--ifnotstarted', 'buildkitd', 'start'));
         }
 
+        if (config.kubernetes.containerEngine === ContainerEngine.CONTAINERD) {
+          this.#containerEngineClient = new NerdctlClient(this);
+        } else {
+          this.#containerEngineClient = new MobyClient(this, 'npipe:////./pipe/docker_engine');
+        }
         await this.setState(config.kubernetes.enabled ? State.STARTED : State.DISABLED);
       } catch (ex) {
         await this.setState(State.ERROR);
@@ -1376,6 +1399,7 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
     try {
       await this.setState(State.STOPPING);
       await this.kubeBackend.stop();
+      this.#containerEngineClient = undefined;
 
       await this.progressTracker.action('Shutting Down...', 10, async() => {
         if (await this.isDistroRegistered({ runningOnly: true })) {

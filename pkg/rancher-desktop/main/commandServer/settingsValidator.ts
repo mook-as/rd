@@ -99,6 +99,7 @@ export default class SettingsValidator {
       startInBackground:    this.checkBoolean,
       hideNotificationIcon: this.checkBoolean,
       window:               { quitOnClose: this.checkBoolean },
+      extensions:           this.checkBooleanMapping,
     };
     this.canonicalizeSynonyms(newSettings);
     const errors: Array<string> = [];

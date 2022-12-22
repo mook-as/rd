@@ -529,17 +529,35 @@ interface commandContext {
  * in order to carry out the business logic for the requests it receives.
  */
 export interface CommandWorkerInterface {
-  factoryReset: (keepSystemImages: boolean) => void;
+  // #region settings
   getSettings: (context: commandContext) => string;
   updateSettings: (context: commandContext, newSettings: RecursivePartial<Settings>) => Promise<[string, string]>;
   proposeSettings: (context: commandContext, newSettings: RecursivePartial<Settings>) => Promise<[string, string]>;
+  getTransientSettings: (context: commandContext) => string;
+  updateTransientSettings: (context: commandContext, newTransientSettings: RecursivePartial<TransientSettings>) => Promise<[string, string]>;
+  // #endregion
+
+  // #region backend
+  factoryReset: (keepSystemImages: boolean) => void;
   requestShutdown: (context: commandContext) => void;
+  // #endregion
+
+  // #region diagnostics
   getDiagnosticCategories: (context: commandContext) => string[]|undefined;
   getDiagnosticIdsByCategory: (category: string, context: commandContext) => string[]|undefined;
   getDiagnosticChecks: (category: string|null, checkID: string|null, context: commandContext) => Promise<DiagnosticsResultCollection>;
   runDiagnosticChecks: (context: commandContext) => Promise<DiagnosticsResultCollection>;
-  getTransientSettings: (context: commandContext) => string;
-  updateTransientSettings: (context: commandContext, newTransientSettings: RecursivePartial<TransientSettings>) => Promise<[string, string]>;
+  // #endregion
+
+  // #region extensions
+  /**
+   * Install or uninstall the given extension.
+   * @param id The image ID of the extension, e.g. "splatform/epinio-docker-desktop"
+   * @param state The target state for the given extension.
+   */
+  installExtension: (context: commandContext, id: string, state: 'install' | 'uninstall') => void;
+  activateExtension: (context: commandContext, id: string) => void;
+  // #endregion
 }
 
 // Extend CommandWorkerInterface to have extra types, as these types are used by
