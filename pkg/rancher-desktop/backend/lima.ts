@@ -1792,7 +1792,7 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
             this.#adminAccess,
             path.join(paths.altAppHome, 'docker.sock'),
             k3sEndpoint);
-          this.#containerEngineClient = new MobyClient(this, path.join(paths.altAppHome, 'docker.sock'));
+          this.#containerEngineClient = new MobyClient(this, `unix://${ path.join(paths.altAppHome, 'docker.sock') }`);
           break;
         case ContainerEngine.CONTAINERD:
           await this.execCommand({ root: true }, '/sbin/rc-service', '--ifnotstarted', 'buildkitd', 'start');

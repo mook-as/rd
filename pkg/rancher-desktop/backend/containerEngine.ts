@@ -4,6 +4,11 @@
  * ContainerEngineClient.run().  All fields are optional.
  */
 export type ContainerRunOptions = {
+  /**
+   * Namespace the container should be created in.
+   * @note Silently ignored when using moby.
+   */
+  namespace?: string;
   /** The name of the container. */
   name?: string;
   /** Container restart policy, defaults to "no". */

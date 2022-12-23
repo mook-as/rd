@@ -5,6 +5,7 @@ import { Extension, ExtensionManager, ExtensionMetadata } from './index';
 
 import MobyClient from '@pkg/backend/mobyClient';
 import paths from '@pkg/utils/paths';
+import { defined } from '@pkg/utils/typeUtils';
 
 export class MobyExtension implements Extension {
   constructor(id: string, client: MobyClient) {
@@ -23,7 +24,15 @@ export class MobyExtension implements Extension {
 
   get metadata(): Promise<ExtensionMetadata> {
     this._metadata ??= (async() => {
-      return JSON.parse(await this.client.readFile(this.id, 'metadata.json'));
+      const raw = await this.client.readFile(this.id, 'metadata.json');
+
+      try {
+        return JSON.parse(raw);
+      } catch (ex) {
+        console.error(raw);
+        console.error(ex);
+        throw ex;
+      }
     })();
 
     return this._metadata as Promise<ExtensionMetadata>;
@@ -77,7 +86,7 @@ export class MobyExtension implements Extension {
 
         await fs.promises.mkdir(binDir, { recursive: true });
         const binaries = (await this.metadata).host?.binaries ?? [];
-        const paths = binaries.map(b => b[plat].path);
+        const paths = binaries.map(b => b[plat].path).filter(defined);
 
         await Promise.all(paths.map(async(p) => {
           await this.client.copyFile(this.id, p, path.join(binDir, path.basename(p)));
@@ -88,12 +97,19 @@ export class MobyExtension implements Extension {
         const vm: { image: string } | { composefile: string } | {} = (await this.metadata).vm ?? {};
 
         if ('image' in vm) {
+          this.client.run(this.id, {
+            namespace: 'rancher-desktop-extensions',
+            name:      `rd-extension-${ this.id }`,
+            restart:   'always',
+          });
         } else if ('composefile' in vm) {
         }
       })(),
     ]);
 
-    throw new Error('Method not implemented.');
+    await fs.promises.writeFile(path.join(this.dir, INSTALLED_MARKER), '', { encoding: 'utf-8' });
+
+    return true;
   }
 
   uninstall(): Promise<boolean> {

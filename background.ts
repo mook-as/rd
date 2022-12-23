@@ -342,6 +342,8 @@ async function startK8sManager() {
   const em = new MobyExtensionManager(client as any);
   const ext = em.getExtension('splatform/epinio-docker-desktop') as MobyExtension;
 
+  await ext.install();
+
   console.log(util.inspect(await ext.metadata, true, null, true));
 }
 

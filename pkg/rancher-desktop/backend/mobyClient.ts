@@ -1,3 +1,7 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+
 import { VMExecutor } from '@pkg/backend/backend';
 import { ContainerEngineClient, ContainerRunOptions } from '@pkg/backend/containerEngine';
 import { spawnFile } from '@pkg/utils/childProcess';
@@ -32,7 +36,8 @@ export default class MobyClient implements ContainerEngineClient {
   }
 
   protected async makeContainer(imageID: string): Promise<string> {
-    const container = (await this.runTool('create', '--entrypoint=/', imageID)).split(/\r?\n/).pop()?.trim();
+    const stdout = await this.runTool('create', '--entrypoint=/', imageID);
+    const container = stdout.split(/\r?\n/).filter(x => x).pop()?.trim();
 
     if (!container) {
       throw new Error(`Failed to create container ${ imageID }`);
@@ -45,21 +50,32 @@ export default class MobyClient implements ContainerEngineClient {
   readFile(imageID: string, filePath: string, options: { encoding?: BufferEncoding; }): Promise<string>;
   async readFile(imageID: string, filePath: string, options?: { encoding?: BufferEncoding }): Promise<string> {
     const encoding = options?.encoding ?? 'utf-8';
-    const container = await this.makeContainer(imageID);
 
+    console.debug(`Reading file ${ imageID }:${ filePath }`);
+
+    const workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'rd-moby-readfile-'));
+    const tempFile = path.join(workDir, path.basename(filePath));
+
+    // `docker cp ... -` returns a tar file, which isn't what we want.  It's
+    // easiest to just copy the file to disk and read it.
     try {
-      const stdout = await this.runTool('cp', `${ container }:${ filePath }`, '-');
+      await this.copyFile(imageID, filePath, workDir, { silent: true });
 
-      return Buffer.from(stdout).toString(encoding);
+      return await fs.promises.readFile(tempFile, { encoding });
     } finally {
-      await spawnFile(this.executable, ['rm', container], { stdio: console });
+      await fs.promises.rm(workDir, { recursive: true });
     }
   }
 
   copyFile(imageID: string, sourcePath: string, destinationPath: string): Promise<void>;
-  copyFile(imageID: string, sourcePath: string, destinationPath: string, options: { resolveSymlinks: false; }): Promise<void>;
-  async copyFile(imageID: string, sourcePath: string, destinationPath: string, options?: { resolveSymlinks?: boolean }): Promise<void> {
+  copyFile(imageID: string, sourcePath: string, destinationPath: string, options: { resolveSymlinks?: false; silent?: true }): Promise<void>;
+  async copyFile(imageID: string, sourcePath: string, destinationPath: string, options?: { resolveSymlinks?: boolean, silent?: boolean }): Promise<void> {
     const resolveSymlinks = options?.resolveSymlinks !== false;
+
+    if (!options?.silent) {
+      console.debug(`Copying ${ imageID }:${ sourcePath } to ${ destinationPath }`);
+    }
+
     const container = await this.makeContainer(imageID);
 
     try {

@@ -149,6 +149,9 @@ export default class NerdctlClient implements ContainerEngineClient {
     if (options?.name) {
       args.push('--name', options.name);
     }
+    if (options?.namespace) {
+      args.unshift('--namespace', options.namespace);
+    }
     args.push(imageID);
 
     return (await this.runTool(...args)).trim();
