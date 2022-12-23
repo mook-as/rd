@@ -13,6 +13,21 @@
         </NuxtLink>
       </li>
     </ul>
+    <section v-if="$config.featureExtensions">
+      <header>Extensions</header>
+      <ul>
+        <li>
+          <NuxtLink to="/general">
+            Blah
+          </NuxtLink>
+        </li>
+        <li>
+          <NuxtLink to="/qqq">
+            <i class="icon icon-circle-plus" />Add Extension
+          </NuxtLink>
+        </li>
+      </ul>
+    </section>
   </nav>
 </template>
 
@@ -46,6 +61,12 @@ export default {
 
           return result;
         });
+      },
+    },
+    extensions: {
+      type:    Array,
+      default: function() {
+        return [];
       },
     },
   },
@@ -100,6 +121,15 @@ ul {
             background-color: var(--nav-active);
         }
     }
+}
+
+section {
+  header {
+    padding: 7.5px 10px;
+  }
+  ul li a {
+    padding-left: calc(7.5px + 1.5em);
+  }
 }
 
 .nav-badge {

@@ -88,6 +88,7 @@ class DevRunner extends events.EventEmitter {
         'Main process',
         'node',
         'node_modules/electron/cli.js',
+        '--force-renderer-accessibility',
         buildUtils.rootDir,
         this.rendererPort.toString(),
         ...process.argv,
