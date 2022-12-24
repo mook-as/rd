@@ -4,6 +4,7 @@ import type { actions as DiagnosticsActions } from '@pkg/store/diagnostics';
 import type { actions as PageActions } from '@pkg/store/page';
 import type { actions as PreferencesActions } from '@pkg/store/preferences';
 import type { actions as TransientSettingsActions } from '@pkg/store/transientSettings';
+import type { actions as K8sManagerActions } from '@pkg/store/k8sManager';
 
 type Actions<
   store extends string,
@@ -20,6 +21,8 @@ type storeActions = Record<string, never>
   & Actions<'diagnostics', typeof DiagnosticsActions>
   & Actions<'credentials', typeof CredentialsActions>
   & Actions<'transientSettings', typeof TransientSettingsActions>
+  & Actions<'k8sManager', typeof K8sManagerActions>
+  & {};
 
 declare module 'vuex/types' {
   export interface Dispatch {

@@ -26,10 +26,13 @@ type UpperAlpha =
 /** Alpha is the set of upper- or lower-case alphabets. */
 type Alpha<T> = T extends UpperAlpha ? T : T extends Lowercase<UpperAlpha> ? T : never;
 
+type Digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
+
 type UpperSnakeCaseInner<T extends string> =
   T extends '' ? never :
   T extends UpperAlpha ? `_${ T }` :
   T extends Alpha<T> ? Uppercase<T> :
+  T extends Digit ? T :
   T extends `${ infer C }${ infer U }` ? `${ UpperSnakeCaseInner<C> }${ UpperSnakeCaseInner<U> }` :
   never;
 
@@ -43,6 +46,7 @@ type UpperSnakeCaseInner<T extends string> =
 export type UpperSnakeCase<T extends string | symbol | number > =
   T extends symbol | number ? never :
   T extends Alpha<T> ? Uppercase<T> :
+  T extends Digit ? T :
   T extends `${ infer C }${ infer U }` ? `${ Uppercase<C> }${ UpperSnakeCaseInner<U> }`
   : T;
 
