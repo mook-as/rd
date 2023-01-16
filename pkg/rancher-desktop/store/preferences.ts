@@ -109,6 +109,8 @@ export const actions = {
     const settings: Settings = await response.json();
 
     dispatch('preferences/initializePreferences', settings, { root: true });
+
+    return settings;
   },
   async commitPreferences({ state, dispatch }: PrefActionContext, args: CommitArgs) {
     const {

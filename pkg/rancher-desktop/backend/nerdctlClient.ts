@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { VMExecutor } from '@pkg/backend/backend';
-import { ContainerEngineClient, ContainerRunOptions } from '@pkg/backend/containerEngine';
+import { ContainerEngineClient, ContainerRunOptions, ContainerStopOptions } from '@pkg/backend/containerEngine';
 import { spawnFile } from '@pkg/utils/childProcess';
 import Logging from '@pkg/utils/logging';
 import { executable } from '@pkg/utils/resources';
@@ -155,5 +155,26 @@ export default class NerdctlClient implements ContainerEngineClient {
     args.push(imageID);
 
     return (await this.runTool(...args)).trim();
+  }
+
+  async stop(container: string, options?: ContainerStopOptions): Promise<void> {
+    function addNS(...args: string[]) {
+      if (options?.namespace) {
+        return [`--namespace=${ options.namespace }`, ...args];
+      }
+
+      return args;
+    }
+
+    if (options?.delete && options.force) {
+      await this.runTool(...addNS('container', 'rm', '--force', container));
+
+      return;
+    }
+
+    await this.runTool(...addNS('container', 'stop', container));
+    if (options?.delete) {
+      await this.runTool(...addNS('container', 'rm', container));
+    }
   }
 }

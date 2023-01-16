@@ -23,6 +23,13 @@ export type ServerState = {
 
 type DispatchFunctionType = (request: http.IncomingMessage, response: http.ServerResponse, context: commandContext) => Promise<void>;
 
+type dispatchVersion = string;
+type dispatchMethod = string;
+
+// the intermediate interface lets TypeScript reason about recursive types.
+interface dispatchEntryRecord { [k: string]: dispatchEntry }
+type dispatchEntry = DispatchFunctionType | dispatchEntryRecord;
+
 const console = Logging.server;
 const SERVER_PORT = 6107;
 const SERVER_FILE_BASENAME = 'rd-engine.json';
@@ -47,7 +54,7 @@ export class HttpCommandServer {
 
   protected commandWorker: CommandWorkerInterface;
 
-  protected dispatchTable: Record<string, Record<string, Record<string, DispatchFunctionType>>> = {
+  protected dispatchTable: Record<dispatchVersion, Record<dispatchMethod, Record<string, dispatchEntry>>> = {
     v0: {
       GET: {
         settings:              this.listSettings,
@@ -63,6 +70,7 @@ export class HttpCommandServer {
         settings:           this.updateSettings,
         propose_settings:   this.proposeSettings,
         transient_settings: this.updateTransientSettings,
+        extension:          { install: this.installExtension },
       },
     },
   };
@@ -163,7 +171,7 @@ export class HttpCommandServer {
 
         return;
       }
-      const command = this.lookupCommand(pathParts[0], method, pathParts[1]);
+      const command = this.lookupCommand(pathParts[0], method, pathParts.slice(1));
 
       if (!command) {
         console.log(`404: No handler for URL ${ method } ${ path }.`);
@@ -182,9 +190,25 @@ export class HttpCommandServer {
     }
   }
 
-  protected lookupCommand(version: string, method: string, commandName: string) {
-    if (commandName) {
-      return this.dispatchTable[version]?.[method]?.[commandName];
+  protected lookupCommand(version: string, method: string, commandNames: string[]): DispatchFunctionType | undefined {
+    if (commandNames.length > 0) {
+      let commands: dispatchEntry | undefined = this.dispatchTable[version]?.[method];
+
+      for (const commandName of commandNames) {
+        if (typeof commands !== 'object') {
+          console.error(`Failed to look up ${ method } command ${ commandNames.join('/') }: cannot index with ${ commandName }`);
+
+          return undefined;
+        }
+        commands = commands?.[commandName];
+      }
+      if (typeof commands !== 'function') {
+        console.error(`Failed to look up command ${ commandNames.join('/') }: leaf is not an endpoint`);
+
+        return undefined;
+      }
+
+      return commands;
     }
     if (version === '' || version in this.dispatchTable) {
       return this.listEndpoints.bind(this, version);
@@ -513,6 +537,38 @@ export class HttpCommandServer {
       console.debug(`updateTransientSettings: write back status 202, result: ${ result }`);
       response.writeHead(202, { 'Content-Type': 'text/plain' });
       response.write(result);
+    }
+  }
+
+  protected async installExtension(request: http.IncomingMessage, response: http.ServerResponse, context: commandContext): Promise<void> {
+    const url = new URL(request.url as string, `http://${ request.headers.host }`);
+    const params = url.searchParams;
+    const id = params.get('id');
+
+    if (!id) {
+      response.writeHead(400, { 'Content-Type': 'text/plain' });
+      response.write('Extension id is required in the id= parameter.');
+
+      return;
+    }
+
+    const em = await (await import('@pkg/main/extensions/manager')).default();
+    const extension = em?.getExtension(id);
+    const desiredState = params.get('state') !== 'false';
+
+    if (!extension) {
+      response.writeHead(503);
+      console.debug(`Failed to install extension ${ id }: could not get extension`);
+
+      return;
+    }
+    response.writeHead(202);
+    if (desiredState) {
+      console.debug(`Installing extension ${ id }`, extension);
+      await extension.install();
+    } else {
+      console.debug(`Uninstalling extension ${ id }`, extension);
+      await extension.uninstall();
     }
   }
 }

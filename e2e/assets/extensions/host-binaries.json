@@ -1,0 +1,24 @@
+{
+  "icon": "extension-icon.svg",
+  "host": {
+    "binaries": [
+      {
+        "darwin": [
+          {
+            "path": "/extension-icon.svg"
+          }
+        ],
+        "windows": [
+          {
+            "path": "/extension-icon.svg"
+          }
+        ],
+        "linux": [
+          {
+            "path": "/extension-icon.svg"
+          }
+        ]
+      }
+    ]
+  }
+}

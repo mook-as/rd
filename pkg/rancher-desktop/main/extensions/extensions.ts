@@ -3,12 +3,15 @@ import path from 'path';
 
 import { Extension, ExtensionManager, ExtensionMetadata } from './index';
 
-import MobyClient from '@pkg/backend/mobyClient';
+import type { ContainerEngineClient } from '@pkg/backend/containerEngine';
+import Logging from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
 import { defined } from '@pkg/utils/typeUtils';
 
-export class MobyExtension implements Extension {
-  constructor(id: string, client: MobyClient) {
+const console = Logging.extensions;
+
+export class ExtensionImpl implements Extension {
+  constructor(id: string, client: ContainerEngineClient) {
     this.id = id;
     this.client = client;
     this.dir = path.join(paths.extensionRoot, id);
@@ -18,7 +21,7 @@ export class MobyExtension implements Extension {
   id: string;
   /** The directory this extension will be installed into */
   protected readonly dir: string;
-  protected readonly client: MobyClient;
+  protected readonly client: ContainerEngineClient;
   /** Extension metadata */
   protected _metadata: Promise<ExtensionMetadata> | undefined;
 
@@ -27,7 +30,11 @@ export class MobyExtension implements Extension {
       const raw = await this.client.readFile(this.id, 'metadata.json');
 
       try {
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+
+        parsed.vm ??= {};
+
+        return parsed;
       } catch (ex) {
         console.error(raw);
         console.error(ex);
@@ -47,29 +54,32 @@ export class MobyExtension implements Extension {
     return this._iconName as Promise<string>;
   }
 
+  protected get containerName() {
+    return `rd-extension.${ this.id.replaceAll('/', '.').replace(/[^a-zA-Z0-9_.-]/g, '_') }`;
+  }
+
   async install(): Promise<boolean> {
-    const INSTALLED_MARKER = 'install-complete';
-
-    try {
-      await fs.promises.access(path.join(this.dir, INSTALLED_MARKER), fs.constants.R_OK);
-
-      return false;
-    } catch (ex) {
-      // Extension was not installed, do it now.
-    }
+    const metadata = await this.metadata;
 
     await fs.promises.mkdir(this.dir, { recursive: true });
     await Promise.all([
+      // Copy the metadata file; it's not required, but it's useful for
+      // troubleshooting.
+      fs.promises.writeFile(path.join(this.dir, 'metadata.json'), JSON.stringify(metadata, undefined, 2)),
       // Copy the icon
       (async() => {
-        await this.client.copyFile(this.id, (await this.metadata).icon, path.join(this.dir, await this.iconName));
+        await this.client.copyFile(this.id, metadata.icon, path.join(this.dir, await this.iconName));
       })(),
       // Copy UI
       (async() => {
         const uiDir = path.join(this.dir, 'ui');
 
+        if (!metadata.ui) {
+          return;
+        }
+
         await fs.promises.mkdir(uiDir, { recursive: true });
-        await Promise.all(Object.entries((await this.metadata).ui ?? {}).map(async([name, data]) => {
+        await Promise.all(Object.entries(metadata.ui).map(async([name, data]) => {
           await this.client.copyFile(this.id, data.root, path.join(uiDir, name));
         }));
       })(),
@@ -85,8 +95,8 @@ export class MobyExtension implements Extension {
         const binDir = path.join(this.dir, 'bin');
 
         await fs.promises.mkdir(binDir, { recursive: true });
-        const binaries = (await this.metadata).host?.binaries ?? [];
-        const paths = binaries.map(b => b[plat].path).filter(defined);
+        const binaries = metadata.host?.binaries ?? [];
+        const paths = binaries.flatMap(p => p[plat]).map(b => b?.path).filter(defined);
 
         await Promise.all(paths.map(async(p) => {
           await this.client.copyFile(this.id, p, path.join(binDir, path.basename(p)));
@@ -94,26 +104,48 @@ export class MobyExtension implements Extension {
       })(),
       // Run the containers
       (async() => {
-        const vm: { image: string } | { composefile: string } | {} = (await this.metadata).vm ?? {};
+        const vm = (await this.metadata).vm;
 
         if ('image' in vm) {
-          this.client.run(this.id, {
+          console.debug(`Running image ${ this.id }`);
+          const stdout = await this.client.run(this.id, {
             namespace: 'rancher-desktop-extensions',
-            name:      `rd-extension-${ this.id }`,
+            name:      this.containerName,
             restart:   'always',
           });
+
+          console.debug(stdout.trim());
         } else if ('composefile' in vm) {
+          console.error(`Running compose file is not implemented`);
         }
       })(),
     ]);
 
-    await fs.promises.writeFile(path.join(this.dir, INSTALLED_MARKER), '', { encoding: 'utf-8' });
+    // TODO: Do something so the extension is recognized by the UI.
+    console.debug(`Install ${ this.id }: install complete.`);
 
     return true;
   }
 
-  uninstall(): Promise<boolean> {
-    throw new Error('Method not implemented.');
+  async uninstall(): Promise<boolean> {
+    const metadata = await this.metadata;
+    const vm = metadata.vm;
+
+    // TODO: Unregister the extension from the UI.
+
+    if ('image' in vm) {
+      await this.client.stop(this.containerName, {
+        namespace: 'rancher-desktop-extensions',
+        force:     true,
+        delete:    true,
+      });
+    } else if ('composefile' in vm) {
+      console.error(`Skipping uninstall of compose file when uninstalling ${ this.id }`);
+    }
+
+    await fs.promises.rmdir(this.dir, { recursive: true });
+
+    return true;
   }
 
   async extractFile(sourcePath: string, destinationPath: string): Promise<void> {
@@ -125,23 +157,28 @@ export class MobyExtension implements Extension {
   }
 }
 
-export class MobyExtensionManager implements ExtensionManager {
-  protected extensions: Record<string, MobyExtension> = {};
+export class ExtensionManagerImpl implements ExtensionManager {
+  protected extensions: Record<string, ExtensionImpl> = {};
 
-  constructor(client: MobyClient) {
+  constructor(client: ContainerEngineClient) {
     this.client = client;
   }
 
-  client: MobyClient;
+  client: ContainerEngineClient;
 
   getExtension(id: string): Extension {
     let ext = this.extensions[id];
 
     if (!ext) {
-      ext = new MobyExtension(id, this.client);
+      ext = new ExtensionImpl(id, this.client);
       this.extensions[id] = ext;
     }
 
     return ext;
+  }
+
+  shutdown() {
+    // TODO
+    return Promise.resolve();
   }
 }

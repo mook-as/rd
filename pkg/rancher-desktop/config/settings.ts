@@ -94,7 +94,11 @@ export const defaultSettings = {
   startInBackground:    false,
   hideNotificationIcon: false,
   window:               { quitOnClose: false },
-  /** UI extensions; the key is an image ID. */
+  /**
+   * UI extensions; the key is an image ID.
+   * Installed extensions are `true`; uninstalled extensions are `false`
+   * (because it's currently not possible to remove preferences).
+   */
   extensions:           {} as Record<string, boolean>,
 };
 

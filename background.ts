@@ -24,7 +24,6 @@ import SettingsValidator from '@pkg/main/commandServer/settingsValidator';
 import { HttpCredentialHelperServer } from '@pkg/main/credentialServer/httpCredentialHelperServer';
 import { DashboardServer } from '@pkg/main/dashboardServer';
 import { DiagnosticsManager, DiagnosticsResultCollection } from '@pkg/main/diagnostics/diagnostics';
-import { MobyExtension, MobyExtensionManager } from '@pkg/main/extensions/mobyExtensions';
 import { ImageEventHandler } from '@pkg/main/imageEvents';
 import { getIpcMainProxy } from '@pkg/main/ipcMain';
 import mainEvents from '@pkg/main/mainEvents';
@@ -339,12 +338,8 @@ async function startK8sManager() {
   await k8smanager.start(cfg);
 
   const client = k8smanager.containerEngineClient;
-  const em = new MobyExtensionManager(client as any);
-  const ext = em.getExtension('splatform/epinio-docker-desktop') as MobyExtension;
 
-  await ext.install();
-
-  console.log(util.inspect(await ext.metadata, true, null, true));
+  await (await import('@pkg/main/extensions/manager')).default(client);
 }
 
 /**
@@ -995,7 +990,11 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
     })());
   }
 
-  installExtension(context: CommandWorkerInterface.CommandContext, id: string, state: 'install' | 'uninstall') {
+  async installExtension(context: CommandWorkerInterface.CommandContext, id: string, state: 'install' | 'uninstall') {
+    const getEM = (await import('@pkg/main/extensions/manager')).default;
+    const em = await getEM(k8smanager.containerEngineClient);
+
+    em?.getExtension(id);
     writeSettings({ extensions: { [id]: state === 'install' } });
   }
 

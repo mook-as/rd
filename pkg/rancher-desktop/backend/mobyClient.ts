@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 
 import { VMExecutor } from '@pkg/backend/backend';
-import { ContainerEngineClient, ContainerRunOptions } from '@pkg/backend/containerEngine';
+import { ContainerEngineClient, ContainerRunOptions, ContainerStopOptions } from '@pkg/backend/containerEngine';
 import { spawnFile } from '@pkg/utils/childProcess';
 import Logging from '@pkg/utils/logging';
 import { executable } from '@pkg/utils/resources';
@@ -97,5 +97,18 @@ export default class MobyClient implements ContainerEngineClient {
     args.push(imageID);
 
     return (await this.runTool(...args)).trim();
+  }
+
+  async stop(container: string, options?: ContainerStopOptions): Promise<void> {
+    if (options?.delete && options.force) {
+      await this.runTool('container', 'rm', '--force', container);
+
+      return;
+    }
+
+    await this.runTool('container', 'stop', container);
+    if (options?.delete) {
+      await this.runTool('container', 'rm', container);
+    }
   }
 }

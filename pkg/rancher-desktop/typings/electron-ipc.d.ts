@@ -106,6 +106,8 @@ export interface IpcMainInvokeEvents {
   // #endregion
 
   // #region extensions
+  /** Install the given extension.  Returns whether any action was taken. Throws on failure. */
+  'extension/install': (id: string) => boolean;
   /** Execute the given command. Output and events are reported via `extension/spawn/*` */
   'extension/spawn': (command: string[], options: { id: string, scope: 'host' | 'vm', cwd?: string, env?: Record<string, string | undefined> }) => void;
   // #endregion

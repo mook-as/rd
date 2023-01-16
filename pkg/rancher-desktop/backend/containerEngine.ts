@@ -16,6 +16,22 @@ export type ContainerRunOptions = {
 };
 
 /**
+ * ContainerStopOptions are the options that can be passed to
+ * ContainerEngineClient.stop().  All fields are optional.
+ */
+export type ContainerStopOptions = {
+  /**
+   * Namespace the container should be created in.
+   * @note Silently ignored when using moby.
+   */
+  namespace?: string;
+  /** Force stop the container (killing it uncleanly). */
+  force?: true;
+  /** Delete the container after stopping. */
+  delete?: true;
+};
+
+/**
  * ContainerEngineClient is used to run commands on the container engine.
  */
 export interface ContainerEngineClient {
@@ -48,4 +64,6 @@ export interface ContainerEngineClient {
    * @returns The container ID.
    */
   run(imageID: string, options?: ContainerRunOptions): Promise<string>;
+
+  stop(container: string, options?: ContainerStopOptions): Promise<void>;
 }

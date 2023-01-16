@@ -3,11 +3,13 @@
  * @see @pkg/extensions for the renderer process code.
  */
 
+import type { ContainerEngineClient } from '@pkg/backend/containerEngine';
+
 export type ExtensionMetadata = {
   icon: string;
   ui?: Record<string, { title: string, root: string, src: string }>;
-  vm?: { image: string } | { composefile: string };
-  host?: { binaries: Record<'darwin' | 'windows' | 'linux', { path: string }>[] };
+  vm: { image: string } | { composefile: string } | {};
+  host?: { binaries: Record<'darwin' | 'windows' | 'linux', { path: string }[]>[] };
 };
 
 /**
@@ -52,10 +54,18 @@ export interface Extension {
 }
 
 export interface ExtensionManager {
+  readonly client: ContainerEngineClient;
+
   /**
    * Get the given extension.
    * @param id The image ID of the extension.
    * @note This may cause the given image to be downloaded.
+   * @note The extension will not be automatically installed.
    */
   getExtension(id: string): Extension;
+
+  /**
+   * Shut down the extension manager, doing any clean up necessary.
+   */
+  shutdown(): Promise<void>;
 }
