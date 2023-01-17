@@ -4,6 +4,7 @@ import path from 'path';
 import { Extension, ExtensionManager, ExtensionMetadata } from './index';
 
 import type { ContainerEngineClient } from '@pkg/backend/containerEngine';
+import mainEvents from '@pkg/main/mainEvents';
 import Logging from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
 import { defined } from '@pkg/utils/typeUtils';
@@ -114,12 +115,14 @@ export class ExtensionImpl implements Extension {
             restart:   'always',
           });
 
-          console.debug(stdout.trim());
+          console.debug(`Running ${ this.id } container image: ${ stdout.trim() }`);
         } else if ('composefile' in vm) {
           console.error(`Running compose file is not implemented`);
         }
       })(),
     ]);
+
+    mainEvents.emit('settings-write', { extensions: { [this.id]: true } });
 
     // TODO: Do something so the extension is recognized by the UI.
     console.debug(`Install ${ this.id }: install complete.`);
@@ -143,7 +146,15 @@ export class ExtensionImpl implements Extension {
       console.error(`Skipping uninstall of compose file when uninstalling ${ this.id }`);
     }
 
-    await fs.promises.rmdir(this.dir, { recursive: true });
+    try {
+      await fs.promises.rmdir(this.dir, { recursive: true });
+    } catch (ex: any) {
+      if ((ex as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw ex;
+      }
+    }
+
+    mainEvents.emit('settings-write', { extensions: { [this.id]: false } });
 
     return true;
   }

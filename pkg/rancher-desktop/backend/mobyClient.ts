@@ -4,7 +4,7 @@ import path from 'path';
 
 import { VMExecutor } from '@pkg/backend/backend';
 import { ContainerEngineClient, ContainerRunOptions, ContainerStopOptions } from '@pkg/backend/containerEngine';
-import { spawnFile } from '@pkg/utils/childProcess';
+import { ErrorCommand, spawnFile } from '@pkg/utils/childProcess';
 import Logging from '@pkg/utils/logging';
 import { executable } from '@pkg/utils/resources';
 import { defined } from '@pkg/utils/typeUtils';
@@ -26,19 +26,20 @@ export default class MobyClient implements ContainerEngineClient {
    * @param args
    * @returns
    */
-  protected async runTool(...args: string[]): Promise<string> {
-    const { stdout } = await spawnFile(
+  protected async runTool(...args: string[]): Promise<{ stdout: string, stderr: string }> {
+    const { stdout, stderr } = await spawnFile(
       this.executable,
       args,
-      { stdio: ['ignore', 'pipe', console], env: { DOCKER_HOST: this.endpoint } });
+      { stdio: ['ignore', 'pipe', 'pipe'], env: { DOCKER_HOST: this.endpoint } });
 
-    return stdout;
+    return { stdout, stderr };
   }
 
   protected async makeContainer(imageID: string): Promise<string> {
-    const stdout = await this.runTool('create', '--entrypoint=/', imageID);
+    const { stdout, stderr } = await this.runTool('create', '--entrypoint=/', imageID);
     const container = stdout.split(/\r?\n/).filter(x => x).pop()?.trim();
 
+    console.debug(stderr.trim());
     if (!container) {
       throw new Error(`Failed to create container ${ imageID }`);
     }
@@ -96,12 +97,32 @@ export default class MobyClient implements ContainerEngineClient {
     }
     args.push(imageID);
 
-    return (await this.runTool(...args)).trim();
+    try {
+      const { stdout, stderr } = (await this.runTool(...args));
+
+      console.debug(stderr.trim());
+
+      return stdout.trim();
+    } catch (ex: any) {
+      if (Object.prototype.hasOwnProperty.call(ex, ErrorCommand)) {
+        const match = /container name "[^"]*" is already in use by container "(?<id>[0-9a-f]+)"./.exec(ex.stderr ?? '');
+        const result = match?.groups?.['id'];
+
+        if (result) {
+          return result;
+        }
+      }
+      throw ex;
+    }
   }
 
   async stop(container: string, options?: ContainerStopOptions): Promise<void> {
     if (options?.delete && options.force) {
-      await this.runTool('container', 'rm', '--force', container);
+      const { stderr } = await this.runTool('container', 'rm', '--force', container);
+
+      if (!/Error: No such container: \S+/.test(stderr)) {
+        console.debug(stderr.trim());
+      }
 
       return;
     }
