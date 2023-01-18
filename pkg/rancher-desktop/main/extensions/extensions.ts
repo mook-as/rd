@@ -4,10 +4,11 @@ import path from 'path';
 import { Extension, ExtensionManager, ExtensionMetadata } from './index';
 
 import type { ContainerEngineClient } from '@pkg/backend/containerEngine';
+import type { Settings } from '@pkg/config/settings';
 import mainEvents from '@pkg/main/mainEvents';
 import Logging from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
-import { defined } from '@pkg/utils/typeUtils';
+import { defined, RecursiveReadonly } from '@pkg/utils/typeUtils';
 
 const console = Logging.extensions;
 
@@ -176,6 +177,12 @@ export class ExtensionManagerImpl implements ExtensionManager {
   }
 
   client: ContainerEngineClient;
+
+  async init(config: RecursiveReadonly<Settings>) {
+    await Promise.all(Object.entries(config.extensions ?? {}).map(([id, install]) => {
+      return this.getExtension(id)[install ? 'install' : 'uninstall']();
+    }));
+  }
 
   getExtension(id: string): Extension {
     let ext = this.extensions[id];

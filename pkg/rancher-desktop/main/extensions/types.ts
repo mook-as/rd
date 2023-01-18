@@ -4,6 +4,7 @@
  */
 
 import type { ContainerEngineClient } from '@pkg/backend/containerEngine';
+import { Settings } from '@pkg/config/settings';
 
 export type ExtensionMetadata = {
   icon: string;
@@ -55,6 +56,8 @@ export interface Extension {
 
 export interface ExtensionManager {
   readonly client: ContainerEngineClient;
+
+  init(config: Settings): Promise<void>;
 
   /**
    * Get the given extension.

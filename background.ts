@@ -337,9 +337,10 @@ async function startK8sManager() {
   }
   await k8smanager.start(cfg);
 
-  const client = k8smanager.containerEngineClient;
+  const getEM = (await import('@pkg/main/extensions/manager')).default;
+  const em = await getEM(k8smanager.containerEngineClient);
 
-  await (await import('@pkg/main/extensions/manager')).default(client);
+  await em.init(cfg);
 }
 
 /**
@@ -994,7 +995,7 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
     const getEM = (await import('@pkg/main/extensions/manager')).default;
     const em = await getEM(k8smanager.containerEngineClient);
 
-    em?.getExtension(id);
+    em.getExtension(id);
     writeSettings({ extensions: { [id]: state === 'install' } });
   }
 
