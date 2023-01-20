@@ -5,12 +5,15 @@ import { Extension, ExtensionManager, ExtensionMetadata } from './index';
 
 import type { ContainerEngineClient } from '@pkg/backend/containerEngine';
 import type { Settings } from '@pkg/config/settings';
+import { getIpcMainProxy } from '@pkg/main/ipcMain';
 import mainEvents from '@pkg/main/mainEvents';
 import Logging from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
 import { defined, RecursiveReadonly } from '@pkg/utils/typeUtils';
+import { openExtension } from '@pkg/window';
 
 const console = Logging.extensions;
+const ipcMain = getIpcMainProxy(console);
 
 export class ExtensionImpl implements Extension {
   constructor(id: string, client: ContainerEngineClient) {
@@ -180,6 +183,17 @@ export class ExtensionManagerImpl implements ExtensionManager {
     await Promise.all(Object.entries(config.extensions ?? {}).map(([id, install]) => {
       return this.getExtension(id)[install ? 'install' : 'uninstall']();
     }));
+    ipcMain.on('extension/ui/dashboard', async(_, id) => {
+      const extension = this.getExtension(id);
+      const encodedID = id.replace(/./g, c => c.charCodeAt(0).toString(16));
+      const baseURL = new URL(`x-rd-extension://${ encodedID }/ui/dashboard-tab/`);
+      const uiInfo = (await extension.metadata).ui?.['dashboard-tab'];
+
+      if (!uiInfo) {
+        throw new Error(`Could not open extension ${ id }: no UI found`);
+      }
+      openExtension(id, new URL(uiInfo.src, baseURL).toString());
+    });
   }
 
   getExtension(id: string): Extension {

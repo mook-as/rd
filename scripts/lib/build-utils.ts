@@ -185,7 +185,7 @@ export default {
     const result = _.merge({}, this.webpackConfig, {
       target: 'electron-preload',
       entry:  { preload: path.resolve(this.rendererSrcDir, 'preload', 'index.ts') },
-      output: { path: path.join(this.rootDir, 'resources') },
+      output: { libraryTarget: 'var', path: path.join(this.rootDir, 'resources') },
     });
 
     delete (result.entry as any).background;

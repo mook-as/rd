@@ -135,15 +135,13 @@ export function openMain() {
   app.dock?.show();
 }
 
-export function openExtension(id: string) {
-  console.debug(`openExtension(${ id })`);
+export function openExtension(id: string, url: string) {
   const preloadPath = path.join(paths.resources, 'preload.js');
-  const encodedID = id.replace(/./g, c => c.charCodeAt(0).toString(16));
 
-  console.log(preloadPath);
+  console.debug(`openExtension(${ id })`, { url, preloadPath });
   createWindow(
     `extension:${ id }`,
-    `x-rd-extension://${ encodedID }/ui/dashboard-tab/`,
+    url,
     {
       width:          800,
       height:         600,

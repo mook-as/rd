@@ -17,8 +17,8 @@
       <header>Extensions</header>
       <ul>
         <li v-for="(metadata, extension) in extensionsWithUI" :key="extension" :item="extension">
-          <a @click="openExtension(extension)">
-            {{ extension }}
+          <a href="#" @click="openExtension(extension)">
+            {{ metadata.title }}
           </a>
         </li>
         <li>
@@ -39,7 +39,8 @@ import { BadgeState } from '@rancher/components';
 import { RouteRecordPublic } from 'vue-router';
 import { mapGetters } from 'vuex';
 
-import { ExtensionMetadata } from '~/main/extensions';
+import { ExtensionMetadata } from '@pkg/main/extensions';
+import { ipcRenderer } from '@pkg/utils/ipcRenderer';
 
 export default {
   components: { BadgeState },
@@ -86,7 +87,7 @@ export default {
   computed: {
     ...mapGetters('extensions', ['extensions']),
     extensionsWithUI() {
-      const results: [string, {icon: string, url: string}][] = [];
+      const results: [string, {icon: string, title: string, url: string}][] = [];
 
       for (const [id, metadata] of Object.entries<ExtensionMetadata>(this.extensions as any)) {
         const uiInfo = metadata.ui?.['dashboard-tab'];
@@ -97,10 +98,10 @@ export default {
         const encodedID = id.replace(/./g, c => c.charCodeAt(0).toString(16));
         const baseURL = new URL(`x-rd-extension://${ encodedID }/ui/dashboard-tab/`);
 
-        console.log(`Resolving extension URL: ${ encodedID }`, { ...uiInfo, baseURL });
         results.push([id, {
-          icon: metadata.icon,
-          url:  new URL(uiInfo.src, baseURL).toString(),
+          title: uiInfo.title,
+          icon:  metadata.icon,
+          url:   new URL(uiInfo.src, baseURL).toString(),
         }]);
       }
 
@@ -108,8 +109,8 @@ export default {
     },
   },
   methods: {
-    openExtension(extension: any) {
-      console.log(extension);
+    openExtension(id: string) {
+      ipcRenderer.send('extension/ui/dashboard', id);
     },
   },
 };

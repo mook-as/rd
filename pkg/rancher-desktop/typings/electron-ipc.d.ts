@@ -67,6 +67,7 @@ export interface IpcMainEvents {
   // #region extensions
   /** Terminate the given process spawned via `extension/spawn`. */
   'extension/spawn/kill': (id: string) => void;
+  'extension/ui/dashboard': (id: string) => void;
   // #endregion
 
   'show-logs': () => void;
