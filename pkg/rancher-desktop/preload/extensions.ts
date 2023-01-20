@@ -1,3 +1,7 @@
+/**
+ * This is the preload script dealing with extensions.
+ */
+
 import { contextBridge } from 'electron';
 
 import { ipcRenderer } from '@pkg/utils/ipcRenderer';

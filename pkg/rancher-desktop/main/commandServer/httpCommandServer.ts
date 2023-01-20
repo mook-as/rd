@@ -553,7 +553,7 @@ export class HttpCommandServer {
     }
 
     const em = await (await import('@pkg/main/extensions/manager')).default();
-    const extension = em.getExtension(id);
+    const extension = em?.getExtension(id);
     const desiredState = params.get('state') !== 'false';
 
     if (!extension) {

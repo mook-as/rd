@@ -16,10 +16,10 @@
     <section v-if="$config.featureExtensions">
       <header>Extensions</header>
       <ul>
-        <li>
-          <NuxtLink to="/general">
-            Blah
-          </NuxtLink>
+        <li v-for="(metadata, extension) in extensionsWithUI" :key="extension" :item="extension">
+          <a :href="metadata.url">
+            {{ extension }}
+          </a>
         </li>
         <li>
           <NuxtLink to="/qqq">
@@ -37,6 +37,9 @@ import os from 'os';
 import { NuxtApp } from '@nuxt/types/app';
 import { BadgeState } from '@rancher/components';
 import { RouteRecordPublic } from 'vue-router';
+import { mapGetters } from 'vuex';
+
+import { ExtensionMetadata } from '~/main/extensions';
 
 export default {
   components: { BadgeState },
@@ -63,12 +66,6 @@ export default {
         });
       },
     },
-    extensions: {
-      type:    Array,
-      default: function() {
-        return [];
-      },
-    },
   },
   data() {
     const nuxt: NuxtApp = (this as any).$nuxt;
@@ -85,6 +82,30 @@ export default {
         return paths;
       }, {}),
     };
+  },
+  computed: {
+    ...mapGetters('extensions', ['extensions']),
+    extensionsWithUI() {
+      const results: [string, {icon: string, url: string}][] = [];
+
+      for (const [id, metadata] of Object.entries<ExtensionMetadata>(this.extensions as any)) {
+        const uiInfo = metadata.ui?.['dashboard-tab'];
+
+        if (!uiInfo) {
+          continue;
+        }
+        const encodedID = id.replace(/./g, c => c.charCodeAt(0).toString(16));
+        const baseURL = new URL(`x-rd-extension://${ encodedID }/ui/dashboard-tab/`);
+
+        console.log(`Resolving extension URL: ${ encodedID }`, { ...uiInfo, baseURL });
+        results.push([id, {
+          icon: metadata.icon,
+          url:  new URL(uiInfo.src, baseURL).toString(),
+        }]);
+      }
+
+      return Object.fromEntries(results);
+    },
   },
 };
 </script>

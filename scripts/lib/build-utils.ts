@@ -8,6 +8,7 @@ import os from 'os';
 import path from 'path';
 import util from 'util';
 
+import _ from 'lodash';
 import webpack from 'webpack';
 
 import babelConfig from 'babel.config';
@@ -174,11 +175,43 @@ export default {
   },
 
   /**
+   * WebPack configuration for the preload script
+   */
+  get webpackConfigPreload(): webpack.Configuration {
+    function isValidRulesetUse(i: webpack.RuleSetUseItem): i is webpack.RuleSetLoader {
+      return typeof i === 'object';
+    }
+
+    const result = _.merge({}, this.webpackConfig, {
+      target: 'electron-preload',
+      entry:  { preload: path.resolve(this.rendererSrcDir, 'preload', 'index.ts') },
+      output: { path: path.join(this.rootDir, 'resources') },
+    });
+
+    delete (result.entry as any).background;
+    const rules = result.module?.rules ?? [];
+    const uses = rules.flatMap((r) => {
+      if (typeof r.use !== 'object') {
+        return [];
+      }
+
+      return Array.isArray(r.use) ? r.use : [r.use];
+    }).filter(isValidRulesetUse) ?? [];
+    const tsLoader = uses?.find(u => u.loader === 'ts-loader');
+
+    if (tsLoader) {
+      tsLoader.options = _.merge({}, tsLoader.options, { compilerOptions: { noEmit: false } });
+    }
+
+    return result;
+  },
+
+  /**
    * Build the main process JavaScript code.
    */
-  buildJavaScript(): Promise<void> {
+  buildJavaScript(config: webpack.Configuration): Promise<void> {
     return new Promise((resolve, reject) => {
-      webpack(this.webpackConfig).run((err, stats) => {
+      webpack(config).run((err, stats) => {
         if (err) {
           return reject(err);
         }
@@ -282,10 +315,18 @@ export default {
   },
 
   /**
+   * Build the preload script.
+   */
+  async buildPreload(): Promise<void> {
+    console.log(util.inspect(this.webpackConfigPreload, true, null, true));
+    await this.buildJavaScript(this.webpackConfigPreload);
+  },
+
+  /**
    * Build the main process code.
    */
   buildMain(): Promise<void> {
-    const tasks = [() => this.buildJavaScript()];
+    const tasks = [() => this.buildJavaScript(this.webpackConfig)];
 
     if (os.platform().startsWith('win')) {
       tasks.push(() => this.buildWSLHelper());

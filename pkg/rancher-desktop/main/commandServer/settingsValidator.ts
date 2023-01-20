@@ -5,6 +5,7 @@ import _ from 'lodash';
 import { defaultSettings, Settings } from '@pkg/config/settings';
 import { NavItemName, navItemNames, TransientSettings } from '@pkg/config/transientSettings';
 import { PathManagementStrategy } from '@pkg/integrations/pathManager';
+import type { ExtensionMetadata } from '@pkg/main/extensions/types';
 import { RecursivePartial } from '@pkg/utils/typeUtils';
 import { preferencesNavItems } from '@pkg/window/preferences';
 
@@ -99,7 +100,7 @@ export default class SettingsValidator {
       startInBackground:    this.checkBoolean,
       hideNotificationIcon: this.checkBoolean,
       window:               { quitOnClose: this.checkBoolean },
-      extensions:           this.checkBooleanMapping,
+      extensions:           this.checkExtensionMetadata,
     };
     this.canonicalizeSynonyms(newSettings);
     const errors: Array<string> = [];
@@ -399,6 +400,78 @@ export default class SettingsValidator {
     }
 
     return !_.isEqual(currentValue, desiredValue);
+  }
+
+  protected checkExtensionMetadata(currentValue: Record<string, ExtensionMetadata | false>, desiredValue: settingsLike, errors: string[], fqname: string): boolean {
+    let hasChanged = false;
+
+    for (const key of Object.keys(desiredValue)) {
+      if (_.isEqual(desiredValue[key], currentValue[key] ?? false)) {
+        // The value hasn't changed, allow it.
+        continue;
+      }
+      hasChanged = true;
+      if (desiredValue[key] === false) {
+        // Some extension is being uninstalled.
+        continue;
+      }
+      // Getting here means we're trying to install an extension.
+      // Note that we generally allow unknown keys, since we may not be up to
+      // date on the latest extension spec.
+      if (typeof desiredValue[key].icon !== 'string') {
+        errors.push(`${ fqname }.${ key }.icon: Icon is missing`);
+      }
+      if (desiredValue[key].ui) {
+        if (typeof desiredValue[key].ui !== 'object') {
+          errors.push(`${ fqname }.${ key }.ui: Not an object`);
+        } else {
+          for (const uiKey of Object.keys(desiredValue[key].ui)) {
+            for (const prop of ['title', 'root', 'src'] as const) {
+              if (typeof desiredValue[key].ui[uiKey][prop] !== 'string') {
+                errors.push(`${ fqname }.${ key }.ui.${ uiKey }: Missing key ${ prop }`);
+              }
+            }
+          }
+        }
+      }
+      if (desiredValue[key].vm) {
+        if (typeof desiredValue[key].vm !== 'object') {
+          errors.push(`${ fqname }.${ key }.vm: Not an object`);
+        } else if (['image', 'composefile'].every(k => !desiredValue[key].vm[k])) {
+          errors.push(`${ fqname }.${ key }.vm: Neither image nor composefile given`);
+        }
+      }
+
+      const host = desiredValue[key].host ?? {};
+
+      if (host.binaries) {
+        if (typeof host.binaries !== 'object') {
+          errors.push(`${ fqname }.${ key }.host: Not an object`);
+        } else if (!Array.isArray(host.binaries)) {
+          errors.push(`${ fqname }.${ key }.host.binaries: Not an array`);
+        } else {
+          for (const [i, binary] of Object.entries(host.binaries)) {
+            if (typeof binary !== 'object' || binary === null) {
+              errors.push(`${ fqname }.${ key }.host.binaries[${ i }]: Not an object`);
+            } else {
+              for (const [platform, paths] of Object.entries(binary)) {
+                if (!Array.isArray(paths)) {
+                  errors.push(`${ fqname }.${ key }.host.binaries[${ i }].${ platform }: Not an array`);
+                } else {
+                  for (const [pathKey, pathObj] of Object.entries(paths)) {
+                    if (typeof pathObj.path !== 'string') {
+                      errors.push(`${ fqname }.${ key }.host.binaries[${ i }].${ platform }[${ pathKey }].path: Not a string`);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return hasChanged;
   }
 
   canonicalizeSynonyms(newSettings: settingsLike): void {

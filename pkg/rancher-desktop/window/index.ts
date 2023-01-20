@@ -1,4 +1,5 @@
 import os from 'os';
+import path from 'path';
 
 import Electron, { BrowserWindow, app, shell } from 'electron';
 
@@ -8,6 +9,7 @@ import * as K8s from '@pkg/backend/k8s';
 import { IpcRendererEvents } from '@pkg/typings/electron-ipc';
 import { isDevEnv } from '@pkg/utils/environment';
 import Logging from '@pkg/utils/logging';
+import paths from '@pkg/utils/paths';
 import { Shortcuts } from '@pkg/utils/shortcuts';
 
 const console = Logging.background;
@@ -62,11 +64,12 @@ export function createWindow(name: string, url: string, options: Electron.Browse
   }
 
   const isInternalURL = (url: string) => {
-    return url.startsWith(`${ webRoot }/`);
+    return url.startsWith(`${ webRoot }/`) || url.startsWith('x-rd-extension://');
   };
 
   window = new BrowserWindow(options);
   window.webContents.on('will-navigate', (event, input) => {
+    console.debug(`will-navigate: ${ input }`);
     if (isInternalURL(input)) {
       return;
     }
@@ -83,7 +86,7 @@ export function createWindow(name: string, url: string, options: Electron.Browse
     return { action: 'deny' };
   });
   window.webContents.on('did-fail-load', (event, errorCode, errorDescription, url) => {
-    console.log(`Failed to load ${ url }: ${ errorCode } (${ errorDescription })`);
+    console.log(`Failed to load ${ url }: ${ errorCode } (${ errorDescription })`, event);
   });
   console.debug('createWindow() name:', name, ' url:', url);
   window.loadURL(url);
@@ -130,6 +133,27 @@ export function openMain() {
   }
 
   app.dock?.show();
+}
+
+export function openExtension(id: string) {
+  console.debug(`openExtension(${ id })`);
+  const preloadPath = path.join(paths.resources, 'preload.js');
+  const encodedID = id.replace(/./g, c => c.charCodeAt(0).toString(16));
+
+  console.log(preloadPath);
+  createWindow(
+    `extension:${ id }`,
+    `x-rd-extension://${ encodedID }/ui/dashboard-tab/`,
+    {
+      width:          800,
+      height:         600,
+      webPreferences: {
+        devTools:         true,
+        nodeIntegration:  false,
+        contextIsolation: true,
+        preload:          preloadPath,
+      },
+    });
 }
 
 /**

@@ -9,6 +9,7 @@ import _ from 'lodash';
 
 import { TransientSettings } from '@pkg/config/transientSettings';
 import { PathManagementStrategy } from '@pkg/integrations/pathManager';
+import type { ExtensionMetadata } from '@pkg/main/extensions/types';
 import clone from '@pkg/utils/clone';
 import Logging from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
@@ -96,10 +97,10 @@ export const defaultSettings = {
   window:               { quitOnClose: false },
   /**
    * UI extensions; the key is an image ID.
-   * Installed extensions are `true`; uninstalled extensions are `false`
-   * (because it's currently not possible to remove preferences).
+   * As we cannot currently remove settings, uninstalled extensions will be set
+   * to `false` rather than removed.
    */
-  extensions:           {} as Record<string, boolean>,
+  extensions:           {} as Record<string, ExtensionMetadata | false>,
 };
 
 export type Settings = typeof defaultSettings;

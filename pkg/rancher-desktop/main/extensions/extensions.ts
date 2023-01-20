@@ -106,9 +106,7 @@ export class ExtensionImpl implements Extension {
       })(),
       // Run the containers
       (async() => {
-        const vm = (await this.metadata).vm;
-
-        if ('image' in vm) {
+        if ('image' in metadata.vm) {
           console.debug(`Running image ${ this.id }`);
           const stdout = await this.client.run(this.id, {
             namespace: 'rancher-desktop-extensions',
@@ -117,13 +115,13 @@ export class ExtensionImpl implements Extension {
           });
 
           console.debug(`Running ${ this.id } container image: ${ stdout.trim() }`);
-        } else if ('composefile' in vm) {
+        } else if ('composefile' in metadata.vm) {
           console.error(`Running compose file is not implemented`);
         }
       })(),
     ]);
 
-    mainEvents.emit('settings-write', { extensions: { [this.id]: true } });
+    mainEvents.emit('settings-write', { extensions: { [this.id]: metadata } });
 
     // TODO: Do something so the extension is recognized by the UI.
     console.debug(`Install ${ this.id }: install complete.`);

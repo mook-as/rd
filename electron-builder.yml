@@ -8,6 +8,8 @@ extraResources:
 - '!resources/darwin/lima-*.tgz'
 - '!resources/linux/lima-*.tgz'
 - '!resources/host/'
+- from: dist/app/preload.js
+  to: preload.js
 files:
 - dist/app/**/*
 - '!**/node_modules/*/prebuilds/!(${platform}*)/*.node'

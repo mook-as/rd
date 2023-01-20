@@ -36,7 +36,7 @@ import DockerDirManager from '@pkg/utils/dockerDirManager';
 import { arrayCustomizer } from '@pkg/utils/filters';
 import Logging, { setLogLevel, clearLoggingDirectory } from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
-import { setupProtocolHandler, protocolRegistered } from '@pkg/utils/protocols';
+import { setupProtocolHandlers, protocolsRegistered } from '@pkg/utils/protocols';
 import { jsonStringifyWithWhiteSpace } from '@pkg/utils/stringify';
 import { RecursivePartial } from '@pkg/utils/typeUtils';
 import { getVersion } from '@pkg/utils/version';
@@ -99,7 +99,7 @@ process.on('unhandledRejection', (reason: any, promise: any) => {
 });
 
 Electron.app.on('second-instance', async() => {
-  await protocolRegistered;
+  await protocolsRegistered;
   console.warn('A second instance was started');
   if (firstRunDialogComplete) {
     window.openMain();
@@ -130,11 +130,21 @@ mainEvents.handle('settings-fetch', () => {
   return Promise.resolve(cfg);
 });
 
+Electron.crashReporter.start({ uploadToServer: false });
+
+Electron.protocol.registerSchemesAsPrivileged([{ scheme: 'app' }, {
+  scheme:     'x-rd-extensions',
+  privileges: {
+    standard:        true,
+    supportFetchAPI: true,
+  },
+}]);
+
 Electron.app.whenReady().then(async() => {
   try {
     const commandLineArgs = getCommandLineArgs();
 
-    setupProtocolHandler();
+    setupProtocolHandlers();
 
     // Needs to happen before any file is written, otherwise that file
     // could be owned by root, which will lead to future problems.
@@ -337,10 +347,11 @@ async function startK8sManager() {
   }
   await k8smanager.start(cfg);
 
+  console.debug('backend starting, initializing extensions...');
   const getEM = (await import('@pkg/main/extensions/manager')).default;
   const em = await getEM(k8smanager.containerEngineClient);
 
-  await em.init(cfg);
+  await em?.init(cfg);
 }
 
 /**
@@ -416,7 +427,7 @@ Electron.app.on('activate', async() => {
 
     return;
   }
-  await protocolRegistered;
+  await protocolsRegistered;
   window.openMain();
 });
 
@@ -994,9 +1005,13 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
   async installExtension(context: CommandWorkerInterface.CommandContext, id: string, state: 'install' | 'uninstall') {
     const getEM = (await import('@pkg/main/extensions/manager')).default;
     const em = await getEM(k8smanager.containerEngineClient);
+    const extension = em?.getExtension(id);
 
-    em.getExtension(id);
-    writeSettings({ extensions: { [id]: state === 'install' } });
+    if (extension && state === 'install') {
+      writeSettings({ extensions: { [id]: await extension.metadata } });
+    } else {
+      writeSettings({ extensions: { [id]: false } });
+    }
   }
 
   activateExtension(context: CommandWorkerInterface.CommandContext, id: string) {
@@ -1016,3 +1031,11 @@ function isRoot(): boolean {
 
   return os.userInfo().uid === 0;
 }
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled rejection', {
+    reason,
+    json: JSON.parse(JSON.stringify(reason)),
+    promise,
+  });
+});

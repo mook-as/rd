@@ -5,6 +5,10 @@ import { app, ProtocolRequest, ProtocolResponse, protocol } from 'electron';
 
 import { isDevEnv } from '@pkg/utils/environment';
 import Latch from '@pkg/utils/latch';
+import Logging from '@pkg/utils/logging';
+import paths from '@pkg/utils/paths';
+
+const console = Logging.background;
 
 /**
  * Create a URL that consists of a base combined with the provided path
@@ -18,6 +22,20 @@ function redirectedUrl(relPath: string) {
   }
 
   return path.join(app.getAppPath(), 'dist', 'app', relPath);
+}
+
+function getMimeTypeForPath(filePath: string): string {
+  const mimeTypeMap: Record<string, string> = {
+    css:  'text/css',
+    html: 'text/html',
+    js:   'text/javascript',
+    json: 'application/json',
+    png:  'image/png',
+    svg:  'image/svg+xml',
+  };
+  const mimeType = mimeTypeMap[path.extname(filePath).toLowerCase().replace(/^\./, '')];
+
+  return mimeType || 'text/html';
 }
 
 /**
@@ -41,26 +59,16 @@ function getProtocolResponse(
     };
   }
 
-  const mimeTypeMap: Record<string, string> = {
-    css:  'text/css',
-    html: 'text/html',
-    js:   'text/javascript',
-    json: 'application/json',
-    png:  'image/png',
-    svg:  'image/svg+xml',
-  };
-  const mimeType = mimeTypeMap[path.extname(relPath).toLowerCase().replace(/^\./, '')];
-
   return {
     path:     redirectUrl,
-    mimeType: mimeType || 'text/html',
+    mimeType: getMimeTypeForPath(relPath),
   };
 }
 
 // Latch that is set when the app:// protocol handler has been registered.
 // This is used to ensure that we don't attempt to open the window before we've
 // done that, when the user attempts to open a second instance of the window.
-export const protocolRegistered = Latch();
+export const protocolsRegistered = Latch();
 
 /**
  * Set up protocol handler for app://
@@ -68,10 +76,11 @@ export const protocolRegistered = Latch();
  * file:// URLs for our resources. Use the same app:// protocol for both dev and
  * production environments.
  */
-export function setupProtocolHandler() {
+function setupAppProtocolHandler() {
   const registrationProtocol = isDevEnv ? protocol.registerHttpProtocol : protocol.registerFileProtocol;
 
-  registrationProtocol('app', (request, callback) => {
+  const result = registrationProtocol('app', (request, callback) => {
+    console.debug(`Resolving ${ request.url }`);
     const relPath = decodeURI(new URL(request.url).pathname);
     const redirectUrl = redirectedUrl(relPath);
     const result = getProtocolResponse(request, redirectUrl, relPath);
@@ -79,5 +88,41 @@ export function setupProtocolHandler() {
     callback(result);
   });
 
-  protocolRegistered.resolve();
+  console.error(`Registered protocol app://: ${ result }`);
+}
+
+/**
+ * Set up protocol handler for x-rd-extension://
+ *
+ * This handler is used for extensions; the format is:
+ * x-rd-extensions://<extension id>/...
+ * Where the extension id is the extension image id, hex encoded (to avoid
+ * issues with slashes).  Base64 was not available in Vue.
+ */
+function setupExtensionProtocolHandler() {
+  const scheme = 'x-rd-extension';
+  const ok = protocol.registerFileProtocol(scheme, (request, callback) => {
+    console.error(`Resolving ${ request.url }`);
+    const url = new URL(request.url);
+    const extensionID = Buffer.from(url.hostname, 'hex').toString('ascii');
+    const filepath = path.join(paths.extensionRoot, extensionID, url.pathname);
+    const result = { path: filepath, mimeType: getMimeTypeForPath(filepath) };
+
+    console.error(`Resolving ${ url } ->`, result);
+    callback(result);
+  });
+
+  console.error(`Registerd protocol ${ scheme }://: ${ ok }`);
+}
+
+export function setupProtocolHandlers() {
+  try {
+    setupAppProtocolHandler();
+    setupExtensionProtocolHandler();
+
+    protocolsRegistered.resolve();
+    console.error('protocol handlers registered');
+  } catch (ex) {
+    console.error('Error registering protocol handlers:', ex);
+  }
 }

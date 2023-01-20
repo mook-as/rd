@@ -89,6 +89,7 @@ class DevRunner extends events.EventEmitter {
         'node',
         'node_modules/electron/cli.js',
         '--force-renderer-accessibility',
+        '--unhandled-rejections=strict',
         buildUtils.rootDir,
         this.rendererPort.toString(),
         ...process.argv,
@@ -111,7 +112,8 @@ class DevRunner extends events.EventEmitter {
   /**
    * Start the renderer process.
    */
-  startRendererProcess(): Promise<void> {
+  async startRendererProcess(): Promise<void> {
+    await buildUtils.buildPreload();
     this.#rendererProcess = this.spawn(
       'Renderer process',
       'node',

@@ -14,16 +14,17 @@ getIpcMainProxy(console).handle('extension/install', (_, id) => {
   return false;
 });
 
-export default async function getExtensionManager(client?: ContainerEngineClient): Promise<ExtensionManager> {
-  if (manager && (!client || manager?.client === client)) {
+export default async function getExtensionManager(client?: ContainerEngineClient): Promise<ExtensionManager | undefined> {
+  if (!client || manager?.client === client) {
+    if (!client && !manager) {
+      console.debug(`Warning: cached client missing, returning nothing`);
+    }
+
     return manager;
   }
   await manager?.shutdown();
 
-  if (!client) {
-    throw new Error('Could not create extension manager without client');
-  }
-
+  console.debug(`Creating new extension manager...`);
   manager = new ExtensionManagerImpl(client);
 
   return manager;
