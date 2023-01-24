@@ -17,7 +17,7 @@
       <header>Extensions</header>
       <ul>
         <li v-for="(metadata, extension) in extensionsWithUI" :key="extension" :item="extension">
-          <a :href="metadata.url">
+          <a @click="openExtension(extension)">
             {{ extension }}
           </a>
         </li>
@@ -105,6 +105,11 @@ export default {
       }
 
       return Object.fromEntries(results);
+    },
+  },
+  methods: {
+    openExtension(extension: any) {
+      console.log(extension);
     },
   },
 };
