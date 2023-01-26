@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import Electron from 'electron';
@@ -217,3 +218,11 @@ export class ExtensionManagerImpl implements ExtensionManager {
     return Promise.resolve();
   }
 }
+
+ipcMain.handle('extension/info', () => {
+  return {
+    platform: process.platform,
+    arch:     Electron.app.runningUnderARM64Translation ? 'arm64' : process.arch,
+    hostname: os.hostname(),
+  };
+});

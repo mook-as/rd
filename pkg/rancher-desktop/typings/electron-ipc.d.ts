@@ -112,6 +112,7 @@ export interface IpcMainInvokeEvents {
   'extension/install': (id: string) => boolean;
   /** Execute the given command. Output and events are reported via `extension/spawn/*` */
   'extension/spawn': (command: string[], options: { id: string, scope: 'host' | 'vm', cwd?: string, env?: Record<string, string | undefined> }) => void;
+  'extension/info': () => { platform: string, arch: string, hostname: string };
   // #endregion
 }
 

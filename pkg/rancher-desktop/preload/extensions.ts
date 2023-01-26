@@ -192,13 +192,20 @@ ipcRenderer.on('extension/spawn/close', (_, id, exitCode) => {
 });
 
 class Client implements v1.DockerDesktopClient {
+  constructor(info: { platform: string, arch: string, hostname: string }) {
+    Object.assign(this.host, info);
+  }
+
   extension: v1.Extension = {} as any;
   desktopUI: v1.DesktopUI = {} as any;
   host: v1.Host = {
     openExternal: (url: string) => {
       ipcRenderer.send('extension/open-external', url);
     },
-  } as any;
+    platform: '<unknown>',
+    arch:     '<unknown>',
+    hostname: '<unknown>',
+  };
 
   docker = {
     cli: { exec: getExec('host') },
@@ -211,14 +218,13 @@ class Client implements v1.DockerDesktopClient {
   } as any;
 }
 
-export default function initExtensions(): Promise<void> {
+export default async function initExtensions(): Promise<void> {
   if (document.location.protocol === 'x-rd-extension:') {
-    const ddClient = new Client();
+    const info = await ipcRenderer.invoke('extension/info');
+    const ddClient = new Client(info);
 
     contextBridge.exposeInMainWorld('ddClient', ddClient);
   } else {
     console.log(`Not doing preload on ${ document.location.protocol }`);
   }
-
-  return Promise.resolve();
 }
