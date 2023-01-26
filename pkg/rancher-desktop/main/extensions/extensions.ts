@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
+import Electron from 'electron';
+
 import { Extension, ExtensionManager, ExtensionMetadata } from './index';
 
 import type { ContainerEngineClient } from '@pkg/backend/containerEngine';
@@ -193,6 +195,9 @@ export class ExtensionManagerImpl implements ExtensionManager {
         throw new Error(`Could not open extension ${ id }: no UI found`);
       }
       openExtension(id, new URL(uiInfo.src, baseURL).toString());
+    });
+    ipcMain.on('extension/open-external', (_, url) => {
+      Electron.shell.openExternal(url);
     });
   }
 

@@ -1799,6 +1799,7 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
           this.#containerEngineClient = new NerdctlClient(this);
           break;
         }
+        console.debug(`Set containerEngineClient to ${ this.#containerEngineClient }`);
 
         await this.setState(config.kubernetes.enabled ? State.STARTED : State.DISABLED);
       } catch (err) {
