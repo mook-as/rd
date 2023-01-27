@@ -10,10 +10,13 @@ import type { ContainerEngineClient } from '@pkg/backend/containerEngine';
 import type { Settings } from '@pkg/config/settings';
 import { getIpcMainProxy } from '@pkg/main/ipcMain';
 import mainEvents from '@pkg/main/mainEvents';
+import type { IpcMainEvents } from '@pkg/typings/electron-ipc';
 import Logging from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
 import { defined, RecursiveReadonly } from '@pkg/utils/typeUtils';
 import { openExtension } from '@pkg/window';
+
+import type { IpcMainEvent } from 'electron';
 
 const console = Logging.extensions;
 const ipcMain = getIpcMainProxy(console);
@@ -173,6 +176,9 @@ export class ExtensionImpl implements Extension {
   }
 }
 
+type IpcMainEventListener<K extends keyof IpcMainEvents> =
+  (event: IpcMainEvent, ...args: Parameters<IpcMainEvents[K]>) => void;
+
 export class ExtensionManagerImpl implements ExtensionManager {
   protected extensions: Record<string, ExtensionImpl> = {};
 
@@ -182,11 +188,35 @@ export class ExtensionManagerImpl implements ExtensionManager {
 
   client: ContainerEngineClient;
 
+  /**
+   * Mapping of event listeners we used with ipcMain.on(), which will be used
+   * to ensure we unregister them correctly.
+   */
+  protected eventListeners: {
+    [channel in keyof IpcMainEvents]?: IpcMainEventListener<channel>;
+  } = {};
+
+  /**
+   * Attach a listener to ipcMainEvents that will be torn down when this
+   * extension manager shuts down.
+   * @note Only one listener per topic is supported.
+   */
+  protected setMainListener<K extends keyof IpcMainEvents>(channel: K, listener: IpcMainEventListener<K>) {
+    const oldListener = this.eventListeners[channel] as IpcMainEventListener<K> | undefined;
+
+    if (oldListener) {
+      console.error(`Removing duplicate event listener for ${ channel }`);
+      ipcMain.removeListener(channel, oldListener);
+    }
+    ipcMain.on<K>(channel, listener);
+  }
+
   async init(config: RecursiveReadonly<Settings>) {
     await Promise.all(Object.entries(config.extensions ?? {}).map(([id, install]) => {
       return this.getExtension(id)[install ? 'install' : 'uninstall']();
     }));
-    ipcMain.on('extension/ui/dashboard', async(_, id) => {
+
+    this.setMainListener('extension/ui/dashboard', async(_, id) => {
       const extension = this.getExtension(id);
       const encodedID = id.replace(/./g, c => c.charCodeAt(0).toString(16));
       const baseURL = new URL(`x-rd-extension://${ encodedID }/ui/dashboard-tab/`);
@@ -197,7 +227,8 @@ export class ExtensionManagerImpl implements ExtensionManager {
       }
       openExtension(id, new URL(uiInfo.src, baseURL).toString());
     });
-    ipcMain.on('extension/open-external', (_, url) => {
+
+    this.setMainListener('extension/open-external', (_, url) => {
       Electron.shell.openExternal(url);
     });
   }
@@ -214,7 +245,14 @@ export class ExtensionManagerImpl implements ExtensionManager {
   }
 
   shutdown() {
-    // TODO
+    // Remove our event listeners (to avoid issues when we switch backends).
+    for (const untypedChannel in this.eventListeners) {
+      const channel = untypedChannel as keyof IpcMainEvents;
+      const listener = this.eventListeners[channel] as IpcMainEventListener<typeof channel>;
+
+      ipcMain.removeListener(channel, listener);
+    }
+
     return Promise.resolve();
   }
 }
