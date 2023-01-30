@@ -20,5 +20,15 @@
         ]
       }
     ]
+  },
+  "ui": {
+    "dashboard-tab": {
+      "title": "Sample Extension With Everything",
+      "root": "/ui",
+      "src": "index.html"
+    }
+  },
+  "vm": {
+    "image": "rd/extension/everything"
   }
 }

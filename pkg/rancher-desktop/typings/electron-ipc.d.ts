@@ -111,7 +111,7 @@ export interface IpcMainInvokeEvents {
   /** Install the given extension.  Returns whether any action was taken. Throws on failure. */
   'extension/install': (id: string) => boolean;
   /** Execute the given command. Output and events are reported via `extension/spawn/*` */
-  'extension/spawn': (command: string[], options: { id: string, scope: 'host' | 'vm', cwd?: string, env?: Record<string, string | undefined> }) => void;
+  'extension/spawn': (command: string[], options: import('@pkg/main/extensions/types').SpawnOptions) => void;
   'extension/info': () => { platform: string, arch: string, hostname: string };
   // #endregion
 }
@@ -164,11 +164,12 @@ export interface IpcRendererEvents {
   'extension/spawn/output': (id: string, data: { stdout?: string, stderr?: string }) => void;
   /**
    * The given process from `extension/spawn` has an error.
-   * @param returnValue The process exit value, either a signal, an exit code,
-   *   or an exception.
    */
-  'extension/spawn/error': (id: string, error: NodeJS.Signals | number | object) => void;
-  /** The given process from `extension/spawn` has exited. */
-  'extension/spawn/close': (id: string, exitCode: number) => void;
+  'extension/spawn/error': (id: string, error: object) => void;
+  /**
+   * The given process from `extension/spawn` has exited.
+   * @param returnValue The process exit value, either a signal or an exit code.
+   */
+  'extension/spawn/close': (id: string, returnValue: NodeJS.Signals | number) => void;
   // #endregion
 }

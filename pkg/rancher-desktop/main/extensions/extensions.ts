@@ -1,27 +1,28 @@
+import childProcess from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
 import Electron from 'electron';
-
-import { Extension, ExtensionManager, ExtensionMetadata } from './index';
+import _ from 'lodash';
 
 import type { ContainerEngineClient } from '@pkg/backend/containerEngine';
 import type { Settings } from '@pkg/config/settings';
 import { getIpcMainProxy } from '@pkg/main/ipcMain';
 import mainEvents from '@pkg/main/mainEvents';
-import type { IpcMainEvents } from '@pkg/typings/electron-ipc';
+import type { IpcMainEvents, IpcMainInvokeEvents } from '@pkg/typings/electron-ipc';
 import Logging from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
 import { defined, RecursiveReadonly } from '@pkg/utils/typeUtils';
 import { openExtension } from '@pkg/window';
 
-import type { IpcMainEvent } from 'electron';
+import type { Extension, ExtensionManager, ExtensionMetadata, SpawnOptions } from './types';
+import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron';
 
 const console = Logging.extensions;
 const ipcMain = getIpcMainProxy(console);
 
-export class ExtensionImpl implements Extension {
+class ExtensionImpl implements Extension {
   constructor(id: string, client: ContainerEngineClient) {
     this.id = id;
     this.client = client;
@@ -31,7 +32,7 @@ export class ExtensionImpl implements Extension {
   /** The extension ID (the image ID) */
   id: string;
   /** The directory this extension will be installed into */
-  protected readonly dir: string;
+  readonly dir: string;
   protected readonly client: ContainerEngineClient;
   /** Extension metadata */
   protected _metadata: Promise<ExtensionMetadata> | undefined;
@@ -179,6 +180,10 @@ export class ExtensionImpl implements Extension {
 type IpcMainEventListener<K extends keyof IpcMainEvents> =
   (event: IpcMainEvent, ...args: Parameters<IpcMainEvents[K]>) => void;
 
+type IpcMainEventHandler<K extends keyof IpcMainInvokeEvents> =
+  (event: IpcMainInvokeEvent, ...args: Parameters<IpcMainInvokeEvents[K]>) =>
+    Promise<ReturnType<IpcMainInvokeEvents[K]>> | ReturnType<IpcMainInvokeEvents[K]>;
+
 export class ExtensionManagerImpl implements ExtensionManager {
   protected extensions: Record<string, ExtensionImpl> = {};
 
@@ -196,6 +201,10 @@ export class ExtensionManagerImpl implements ExtensionManager {
     [channel in keyof IpcMainEvents]?: IpcMainEventListener<channel>;
   } = {};
 
+  protected eventHandlers: {
+    [channel in keyof IpcMainInvokeEvents]?: IpcMainEventHandler<channel>;
+  } = {};
+
   /**
    * Attach a listener to ipcMainEvents that will be torn down when this
    * extension manager shuts down.
@@ -209,6 +218,16 @@ export class ExtensionManagerImpl implements ExtensionManager {
       ipcMain.removeListener(channel, oldListener);
     }
     ipcMain.on<K>(channel, listener);
+  }
+
+  protected setMainHandler<K extends keyof IpcMainInvokeEvents>(channel: K, listener: IpcMainEventHandler<K>) {
+    const oldHandler = this.eventHandlers[channel];
+
+    if (oldHandler) {
+      console.error(`Removing duplicate event listener for ${ channel }`);
+      ipcMain.removeHandler(channel);
+    }
+    ipcMain.handle<K>(channel, listener);
   }
 
   async init(config: RecursiveReadonly<Settings>) {
@@ -231,6 +250,18 @@ export class ExtensionManagerImpl implements ExtensionManager {
     this.setMainListener('extension/open-external', (_, url) => {
       Electron.shell.openExternal(url);
     });
+
+    this.setMainHandler('extension/spawn', (event, command, options) => {
+      switch (options.scope) {
+      case 'host':
+        return this.spawnHost(event, command, options);
+      case 'vm':
+        return this.spawnVM(command, options);
+      default:
+        console.error(`Unexpected scope ${ options.scope }`);
+        throw new Error(`Unexpected scope ${ options.scope }`);
+      }
+    });
   }
 
   getExtension(id: string): Extension {
@@ -244,6 +275,44 @@ export class ExtensionManagerImpl implements ExtensionManager {
     return ext;
   }
 
+  protected spawnHost(event: IpcMainInvokeEvent, command: string[], options: SpawnOptions) {
+    const extension = this.getExtension(options.extension) as ExtensionImpl;
+    const exeExtension = process.platform === 'win32' ? '.exe' : '';
+    const exePath = path.join(extension.dir, 'bin', command[0]) + exeExtension;
+    const proc = childProcess.spawn(exePath, command.slice(1), {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ..._.pick(options, ['cwd', 'env']),
+    });
+
+    proc.stdout.on('data', (data) => {
+      event.senderFrame.send('extension/spawn/output', options.id, { stdout: data });
+    });
+    proc.stderr.on('data', (data) => {
+      event.senderFrame.send('extension/spawn/output', options.id, { stderr: data });
+    });
+    let errored = false;
+
+    proc.on('error', (error) => {
+      errored = true;
+      event.senderFrame.send('extension/spawn/error', options.id, error);
+    });
+    proc.on('exit', (code, signal) => {
+      if (errored) {
+        return;
+      }
+      if (code !== null) {
+        event.senderFrame.send('extension/spawn/close', options.id, code);
+      } else {
+        errored = true;
+        event.senderFrame.send('extension/spawn/error', options.id, signal);
+      }
+    });
+  }
+
+  protected spawnVM(command: string[], options: SpawnOptions) {
+
+  }
+
   shutdown() {
     // Remove our event listeners (to avoid issues when we switch backends).
     for (const untypedChannel in this.eventListeners) {
@@ -251,6 +320,10 @@ export class ExtensionManagerImpl implements ExtensionManager {
       const listener = this.eventListeners[channel] as IpcMainEventListener<typeof channel>;
 
       ipcMain.removeListener(channel, listener);
+    }
+
+    for (const untypedChannel in this.eventHandlers) {
+      ipcMain.removeHandler(untypedChannel as keyof IpcMainInvokeEvents);
     }
 
     return Promise.resolve();

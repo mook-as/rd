@@ -137,9 +137,10 @@ export default {
         modules:    ['node_modules'],
       },
       output: {
-        libraryTarget: 'commonjs2',
-        filename:      '[name].js',
-        path:          this.appDir,
+        libraryTarget:     'commonjs2',
+        filename:          '[name].js',
+        sourceMapFilename: '[file].map',
+        path:              this.appDir,
       },
       module: {
         rules: [

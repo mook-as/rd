@@ -72,3 +72,27 @@ export interface ExtensionManager {
    */
   shutdown(): Promise<void>;
 }
+
+export type SpawnOptions = {
+  /**
+   * Identifier for the extension that initiated the spawn.
+   */
+  extension: string;
+  /**
+   * Identifier for the spawn event, scoped to the webContents frame.
+   */
+  id: string;
+  /**
+   * The scope where the execution will take place; this is determined by which
+   * API is being called.
+   */
+  scope: 'host' | 'vm' | 'container';
+  /**
+   * Current working directory for the command.
+   */
+  cwd?: string;
+  /**
+   * Override the process environment variables when running this command.
+   */
+  env?: Record<string, string | undefined>;
+};
