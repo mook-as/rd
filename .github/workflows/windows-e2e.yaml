@@ -17,6 +17,9 @@ jobs:
         continue-on-error: true
       - run: wsl --unregister rancher-desktop-data
         continue-on-error: true
+      - run: |
+          Remove-Item -Path "$HOME/AppData/Local/rancher-desktop" -Recurse -Force -ErrorAction Ignore
+          Remove-Item -Path "$HOME/AppData/Roaming/rancher-desktop" -Recurse -Force -ErrorAction Ignore
       - uses: actions/checkout@v3
         with:
           persist-credentials: false
