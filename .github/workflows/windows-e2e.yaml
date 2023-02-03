@@ -10,8 +10,6 @@ jobs:
   e2e-tests:
     timeout-minutes: 90
     runs-on: [self-hosted, Windows, X64]
-    env:
-      TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - run: wsl --unregister rancher-desktop
         continue-on-error: true
