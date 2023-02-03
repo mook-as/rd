@@ -984,7 +984,7 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
 
     // The process should already be gone by this point, but make sure.
     this.process?.kill('SIGTERM');
-    logFile.debug('Starting Rancher Desktop WSL init process');
+    logFile.log('Starting Rancher Desktop WSL init process');
     this.process = childProcess.spawn('wsl.exe',
       ['--distribution', INSTANCE_NAME, '--exec', '/usr/local/bin/wsl-init'],
       {
