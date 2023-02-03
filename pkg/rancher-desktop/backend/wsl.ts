@@ -797,7 +797,15 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
       options = optionsOrArg;
     }
     try {
-      const stream = options.logStream ?? await Logging['wsl-exec'].fdStream;
+      let stream = options.logStream;
+
+      if (!stream) {
+        const logFile = Logging['wsl-exec'];
+
+        // Write a duplicate log line so we can line up the log files.
+        logFile.log(`Running: wsl.exe ${ args.join(' ') }`);
+        stream = await logFile.fdStream;
+      }
 
       // We need two separate calls so TypeScript can resolve the return values.
       if (options.capture) {
@@ -962,7 +970,8 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
    * This manages {this.process}.
    */
   protected async runInit() {
-    const stream = await Logging['wsl-exec'].fdStream;
+    const logFile = Logging['wsl-exec'];
+    const stream = await logFile.fdStream;
     const PID_FILE = '/var/run/wsl-init.pid';
 
     // Delete any stale wsl-init PID file
@@ -975,6 +984,7 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
 
     // The process should already be gone by this point, but make sure.
     this.process?.kill('SIGTERM');
+    logFile.debug('Starting Rancher Desktop WSL init process');
     this.process = childProcess.spawn('wsl.exe',
       ['--distribution', INSTANCE_NAME, '--exec', '/usr/local/bin/wsl-init'],
       {
