@@ -1355,8 +1355,17 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
           '(', '-name', '*.start', '-o', '-name', '*.stop', ')',
           '-print', '-exec', 'chmod', 'a+x', '{}', ';');
 
-        // Run the script.
-        await this.execCommand('/usr/local/bin/wsl-service', '--debug', 'local', 'start');
+        // Run the script.  Note that this sometimes exist with non-zero even
+        // though everything seems to have succeeded, so we are adding extra
+        // debugging.
+        await this.execCommand('/bin/sh', '-x', '-c',
+          `
+            set +o errexit;
+            /usr/local/bin/wsl-service --debug local start
+            result=$?
+            printf "XXXXX local service exited with %d XXXXX\n" $result
+            exit $result
+          `.replace(/\r/g, ''));
       })(),
     ]);
   }
