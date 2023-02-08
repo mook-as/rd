@@ -6,7 +6,7 @@ import stream from 'stream';
 import { Log } from '@pkg/utils/logging';
 
 export {
-  ChildProcess, CommonOptions, SpawnOptions, exec, spawn,
+  ChildProcess, CommonOptions, SpawnOptions, exec, execFile, spawn,
 } from 'child_process';
 
 /**
@@ -35,6 +35,10 @@ interface SpawnError extends Error {
   stderr?: string;
   code?: number;
   signal?: NodeJS.Signals;
+}
+
+export function IsSpawnError(input: any): input is SpawnError {
+  return Object.getOwnPropertySymbols(input).includes(ErrorCommand);
 }
 
 /**

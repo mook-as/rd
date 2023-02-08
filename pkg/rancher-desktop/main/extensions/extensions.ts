@@ -1,4 +1,3 @@
-import childProcess from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -11,12 +10,15 @@ import type { Settings } from '@pkg/config/settings';
 import { getIpcMainProxy } from '@pkg/main/ipcMain';
 import mainEvents from '@pkg/main/mainEvents';
 import type { IpcMainEvents, IpcMainInvokeEvents } from '@pkg/typings/electron-ipc';
+import * as childProcess from '@pkg/utils/childProcess';
 import Logging from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
 import { defined, RecursiveReadonly } from '@pkg/utils/typeUtils';
 import { openExtension } from '@pkg/window';
 
-import type { Extension, ExtensionManager, ExtensionMetadata, SpawnOptions } from './types';
+import type {
+  Extension, ExtensionManager, ExtensionMetadata, SpawnOptions, SpawnResult,
+} from './types';
 import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron';
 
 const console = Logging.extensions;
@@ -251,16 +253,29 @@ export class ExtensionManagerImpl implements ExtensionManager {
       Electron.shell.openExternal(url);
     });
 
-    this.setMainHandler('extension/spawn', (event, command, options) => {
+    this.setMainListener('extension/spawn/streaming', (event, options) => {
       switch (options.scope) {
       case 'host':
-        return this.spawnHost(event, command, options);
+        return this.spawnHostStreaming(event, options);
       case 'vm':
-        return this.spawnVM(command, options);
-      default:
-        console.error(`Unexpected scope ${ options.scope }`);
-        throw new Error(`Unexpected scope ${ options.scope }`);
+        return;
+      case 'container':
+        return;
       }
+      console.error(`Unexpected scope ${ options.scope }`);
+      throw new Error(`Unexpected scope ${ options.scope }`);
+    });
+    this.setMainHandler('extension/spawn/blocking', (event, options) => {
+      switch (options.scope) {
+      case 'host':
+        return this.spawnHostBlocking(options);
+      case 'vm':
+        return {} as any;
+      case 'container':
+        return {} as any;
+      }
+      console.error(`Unexpected scope ${ options.scope }`);
+      throw new Error(`Unexpected scope ${ options.scope }`);
     });
   }
 
@@ -275,23 +290,40 @@ export class ExtensionManagerImpl implements ExtensionManager {
     return ext;
   }
 
-  protected spawnHost(event: IpcMainInvokeEvent, command: string[], options: SpawnOptions) {
+  protected spawnHostBlocking(options: SpawnOptions): Promise<SpawnResult> {
     const extension = this.getExtension(options.extension) as ExtensionImpl;
     const exeExtension = process.platform === 'win32' ? '.exe' : '';
-    const exePath = path.join(extension.dir, 'bin', command[0]) + exeExtension;
-    const proc = childProcess.spawn(exePath, command.slice(1), {
+    const exePath = path.join(extension.dir, 'bin', options.command[0]) + exeExtension;
+
+    return new Promise((resolve) => {
+      childProcess.execFile(exePath, options.command.slice(1), { ..._.pick(options, ['cwd', 'env']) }, (error, stdout, stderr) => {
+        resolve({
+          command: options.command.join(' '),
+          killed:  true,
+          result:  error?.signal ?? error?.code ?? 0,
+          stdout,
+          stderr,
+        });
+      });
+    });
+  }
+
+  protected spawnHostStreaming(event: IpcMainEvent, options: SpawnOptions) {
+    const extension = this.getExtension(options.extension) as ExtensionImpl;
+    const exeExtension = process.platform === 'win32' ? '.exe' : '';
+    const exePath = path.join(extension.dir, 'bin', options.command[0]) + exeExtension;
+    const proc = childProcess.spawn(exePath, options.command.slice(1), {
       stdio: ['ignore', 'pipe', 'pipe'],
       ..._.pick(options, ['cwd', 'env']),
     });
-
-    proc.stdout.on('data', (data) => {
-      event.senderFrame.send('extension/spawn/output', options.id, { stdout: data });
-    });
-    proc.stderr.on('data', (data) => {
-      event.senderFrame.send('extension/spawn/output', options.id, { stderr: data });
-    });
     let errored = false;
 
+    proc.stdout.on('data', (stdout: string | Buffer) => {
+      event.senderFrame.send('extension/spawn/output', options.id, { stdout: stdout.toString('utf-8') });
+    });
+    proc.stderr.on('data', (stderr: string | Buffer) => {
+      event.senderFrame.send('extension/spawn/output', options.id, { stderr: stderr.toString('utf-8') });
+    });
     proc.on('error', (error) => {
       errored = true;
       event.senderFrame.send('extension/spawn/error', options.id, error);
@@ -300,7 +332,7 @@ export class ExtensionManagerImpl implements ExtensionManager {
       if (errored) {
         return;
       }
-      if (code !== null) {
+      if (code !== null ) {
         event.senderFrame.send('extension/spawn/close', options.id, code);
       } else {
         errored = true;

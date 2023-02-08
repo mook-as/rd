@@ -4,7 +4,7 @@
  */
 
 import type { ContainerEngineClient } from '@pkg/backend/containerEngine';
-import { Settings } from '@pkg/config/settings';
+import type { Settings } from '@pkg/config/settings';
 
 export type ExtensionMetadata = {
   icon: string;
@@ -75,6 +75,11 @@ export interface ExtensionManager {
 
 export type SpawnOptions = {
   /**
+   * The command to invoke, including arguments.  For some scopes, the
+   * executable may be fixed (and therefore this only contains arguments).
+   */
+  command: string[];
+  /**
    * Identifier for the extension that initiated the spawn.
    */
   extension: string;
@@ -95,4 +100,18 @@ export type SpawnOptions = {
    * Override the process environment variables when running this command.
    */
   env?: Record<string, string | undefined>;
+};
+
+/**
+ * SpawnResult is the result of extension/spawn/blocking
+ */
+export type SpawnResult = {
+  /** The command executed. */
+  command: string;
+  /** Whether the process was forcefully killed. */
+  killed: boolean;
+  /** The command exit code / signal. */
+  result: NodeJS.Signals | number;
+  stdout: string;
+  stderr: string;
 };

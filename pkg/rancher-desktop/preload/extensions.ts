@@ -6,7 +6,6 @@ import { contextBridge } from 'electron';
 
 import type { SpawnOptions } from '@pkg/main/extensions/types';
 import { ipcRenderer } from '@pkg/utils/ipcRenderer';
-import Latch from '@pkg/utils/latch';
 
 /* eslint-disable import/namespace -- that rule doesn't work with TypeScript type-only imports. */
 import type { v1 } from '@docker/extension-api-client-types';
@@ -14,6 +13,9 @@ import type { v1 } from '@docker/extension-api-client-types';
 function isSpawnOptions(options: v1.ExecOptions | v1.SpawnOptions): options is v1.SpawnOptions {
   return 'stream' in options;
 }
+
+/** execScope is a marker for execution scope for the exec() functions. */
+type execScope = 'vm' | 'host';
 
 // As Electron's contextBridge does not allow custom classes to be passed
 // through correctly, we instead create a template object and copy all of its
@@ -23,83 +25,18 @@ function isSpawnOptions(options: v1.ExecOptions | v1.SpawnOptions): options is v
 
 // We use a bunch of symbols for names of properties we do not want to reflect
 // over.
-const consumeOutput = Symbol('consumeOutput');
 const stream = Symbol('stream');
 const stdout = Symbol('stdout');
 const stderr = Symbol('stderr');
 const id = Symbol('id');
-const done = Symbol('done');
 
-interface execReturn {
+interface execProcess extends v1.ExecProcess {
   /** The identifier for this process. */
   [id]: string;
-  [consumeOutput](key: 'stdout' | 'stderr', data: string): void;
-  [done]: ReturnType<typeof Latch>;
-}
-
-interface execResult extends v1.ExecResult, execReturn {
-  killed: boolean;
-  code?: number;
-  signal?: NodeJS.Signals;
-  stdout: string;
-  stderr: string;
-}
-
-interface execProcess extends v1.ExecProcess, execReturn {
   [stdout]: string;
   [stderr]: string;
   [stream]: v1.ExecStreamOptions;
 }
-
-function isProcess(input: execReturn): input is execProcess {
-  return 'close' in input;
-}
-
-/**
- * execProcessTemplate is the object template used when the caller requests
- * streaming data.
- */
-const execProcessTemplate: Omit<execProcess, typeof id | typeof done | typeof stream> = {
-  close() {
-  },
-  [stdout]: '',
-  [stderr]: '',
-  [consumeOutput](this: execProcess, key, data) {
-    if (!data) {
-      return;
-    }
-    const keySym = { stdout, stderr }[key] as typeof stdout | typeof stderr;
-
-    this[keySym] += data;
-    while (true) {
-      const [_match, line, rest] = /^(.*?)\r?\n(.*)$/s.exec(this[keySym]) ?? [];
-
-      if (typeof line === 'undefined') {
-        return;
-      }
-      this[stream]?.onOutput?.({ [key]: line } as { stdout: string } | { stderr: string });
-      this[keySym] = rest;
-    }
-  },
-};
-
-const execResultTemplate: Omit<execResult, typeof id | typeof done> = {
-  killed: false,
-  lines(): string[] {
-    return this.stdout.split(/\r?\n/);
-  },
-  parseJsonLines(): any[] {
-    return this.lines().map(line => JSON.parse(line));
-  },
-  parseJsonObject() {
-    return JSON.parse(this.stdout);
-  },
-  [consumeOutput](this: execResult, key, data) {
-    this[key] += data;
-  },
-  stdout: '',
-  stderr: '',
-};
 
 /**
  * The identifier for the extension (the name of the image).
@@ -111,7 +48,7 @@ const extensionId = decodeURIComponent((location.href.match(/:\/\/([^/]+)/)?.[1]
  * This uses weak references so that if the user no longer cares about them we
  * will not either.
  */
-const outstandingProcesses: Record<string, WeakRef<execResult | execProcess>> = {};
+const outstandingProcesses: Record<string, WeakRef<execProcess>> = {};
 
 function getTypeErrorMessage(name: string, expectedType: string, object: any) {
   let message = `[ERROR_INVALID_ARG_TYPE]: The "${ name }" argument must be of type ${ expectedType }.`;
@@ -129,14 +66,12 @@ function getTypeErrorMessage(name: string, expectedType: string, object: any) {
  * Return an exec function for the given scope.
  * @param scope Whether to run the command on the VM or in the host.
  */
-function getExec(scope: 'host' | 'vm'): v1.Exec {
+function getExec(scope: execScope): v1.Exec {
   let nextId = 0;
 
   function exec(cmd: string, args: string[], options?: v1.ExecOptions): Promise<v1.ExecResult>;
   function exec(cmd: string, args: string[], options: v1.SpawnOptions): v1.ExecProcess;
   function exec(cmd: string, args: string[], options?: v1.ExecOptions | v1.SpawnOptions): Promise<v1.ExecResult> | v1.ExecProcess {
-    const commandLine = [cmd].concat(args);
-
     // Do some minimal parameter validation, since passing these to the backend
     // directly can end up with confusing messages otherwise.
     if (typeof cmd !== 'string') {
@@ -168,6 +103,7 @@ function getExec(scope: 'host' | 'vm'): v1.Exec {
     // Build options to pass to the main process, while not trusting the input
     // too much.
     const safeOptions: SpawnOptions = {
+      command:   [cmd].concat(args),
       extension: extensionId,
       id:        execId,
       scope,
@@ -176,32 +112,38 @@ function getExec(scope: 'host' | 'vm'): v1.Exec {
     };
 
     if (options && isSpawnOptions(options)) {
-      const proc: execProcess = Object.assign({
+      const proc: execProcess = {
         [id]:     execId,
-        [done]:   Latch(),
         [stdout]: '',
         [stderr]: '',
         [stream]: options.stream,
-      }, execProcessTemplate);
+        close() {
+          ipcRenderer.send('extension/spawn/kill', execId);
+          delete outstandingProcesses[execId];
+        },
+      };
 
       outstandingProcesses[execId] = new WeakRef(proc);
-      ipcRenderer.invoke('extension/spawn', commandLine, safeOptions);
+      ipcRenderer.send('extension/spawn/streaming', safeOptions);
 
       return proc;
     }
 
     return (async() => {
-      const proc: execResult = Object.assign({
-        [id]:     execId,
-        [done]:   Latch(),
-        [stdout]: '',
-        [stderr]: '',
-      }, execResultTemplate);
+      const response = await ipcRenderer.invoke('extension/spawn/blocking', safeOptions);
 
-      outstandingProcesses[execId] = new WeakRef(proc);
-      await proc[done];
-
-      return proc;
+      return {
+        ...response,
+        lines() {
+          return response.stdout.split(/\r?\n/);
+        },
+        parseJsonLines() {
+          return response.stdout.split(/\r?\n/).filter(line => line).map(line => JSON.parse(line));
+        },
+        parseJsonObject() {
+          return JSON.parse(response.stdout);
+        },
+      };
     })();
   }
 
@@ -215,25 +157,26 @@ ipcRenderer.on('extension/spawn/output', (_, id, data) => {
     // The process handle has gone away on our side, just try to kill it.
     ipcRenderer.send('extension/spawn/kill', id);
     delete outstandingProcesses[id];
+    console.debug(`Process ${ id } not found, discarding.`);
 
     return;
   }
-  if (isProcess(process)) {
-    if (process[stream].onOutput) {
-      for (const key of ['stdout', 'stderr'] as const) {
-        const input = data[key];
-
-        if (input) {
-          process[consumeOutput](key, input);
-        }
-      }
-    }
-  } else {
+  if (process[stream].onOutput) {
     for (const key of ['stdout', 'stderr'] as const) {
       const input = data[key];
+      const keySym = { stdout, stderr }[key] as typeof stdout | typeof stderr;
 
       if (input) {
-        process[key] += input;
+        process[keySym] += input;
+        while (true) {
+          const [_match, line, rest] = /^(.*?)\r?\n(.*)$/s.exec(process[keySym]) ?? [];
+
+          if (typeof line === 'undefined') {
+            return;
+          }
+          process[stream].onOutput?.({ [key]: line } as {stdout:string} | {stderr:string});
+          process[keySym] = rest;
+        }
       }
     }
   }
@@ -250,13 +193,7 @@ ipcRenderer.on('extension/spawn/error', (_, id, error) => {
     return;
   }
 
-  if (isProcess(process)) {
-    process[stream].onError?.(error);
-    process[done].resolve();
-  } else {
-    process.killed = true;
-    process[done].reject(error);
-  }
+  process[stream].onError?.(error);
 });
 
 ipcRenderer.on('extension/spawn/close', (_, id, returnValue) => {
@@ -270,17 +207,7 @@ ipcRenderer.on('extension/spawn/close', (_, id, returnValue) => {
     return;
   }
 
-  if (isProcess(process)) {
-    process[stream]?.onClose?.(typeof returnValue === 'number' ? returnValue : -1);
-  } else {
-    process.killed = true;
-    if (typeof returnValue === 'number') {
-      process.code = returnValue;
-    } else {
-      process.signal = returnValue;
-    }
-  }
-  process[done].resolve();
+  process[stream]?.onClose?.(typeof returnValue === 'number' ? returnValue : -1);
 });
 
 class Client implements v1.DockerDesktopClient {
@@ -322,6 +249,6 @@ export default async function initExtensions(): Promise<void> {
 
     contextBridge.exposeInMainWorld('ddClient', ddClient);
   } else {
-    console.log(`Not doing preload on ${ document.location.protocol }`);
+    console.debug(`Not doing preload on ${ document.location.protocol }`);
   }
 }

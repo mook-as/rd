@@ -562,13 +562,20 @@ export class HttpCommandServer {
 
       return;
     }
-    response.writeHead(202);
+    response.writeProcessing();
     if (desiredState) {
       console.debug(`Installing extension ${ id }`, extension);
-      await extension.install();
+      const result = await extension.install();
+
+      if (result) {
+        response.writeHead(201);
+      } else {
+        response.writeHead(204);
+      }
     } else {
       console.debug(`Uninstalling extension ${ id }`, extension);
       await extension.uninstall();
+      response.writeHead(204);
     }
   }
 }

@@ -65,9 +65,13 @@ export interface IpcMainEvents {
   // #endregion
 
   // #region extensions
-  /** Terminate the given process spawned via `extension/spawn`. */
+  /** Execute the given command, streaming results back via events. */
+  'extension/spawn/streaming': (options: import('@pkg/main/extensions/types').SpawnOptions) => void;
+  /** Force-terminate a process created via extension/spawn/{blocking,streaming}. */
   'extension/spawn/kill': (id: string) => void;
+  /** Launch the UI for a given extension. */
   'extension/ui/dashboard': (id: string) => void;
+  /** Launch the given URL via the operating system (outside the app). */
   'extension/open-external': (url: string) => void;
   // #endregion
 
@@ -110,8 +114,8 @@ export interface IpcMainInvokeEvents {
   // #region extensions
   /** Install the given extension.  Returns whether any action was taken. Throws on failure. */
   'extension/install': (id: string) => boolean;
-  /** Execute the given command. Output and events are reported via `extension/spawn/*` */
-  'extension/spawn': (command: string[], options: import('@pkg/main/extensions/types').SpawnOptions) => void;
+  /** Execute the given command and return the results. */
+  'extension/spawn/blocking': (options: import('@pkg/main/extensions/types').SpawnOptions) => import('@pkg/main/extensions/types').SpawnResult;
   'extension/info': () => { platform: string, arch: string, hostname: string };
   // #endregion
 }
