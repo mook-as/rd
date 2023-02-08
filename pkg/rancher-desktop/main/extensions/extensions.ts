@@ -11,6 +11,7 @@ import { getIpcMainProxy } from '@pkg/main/ipcMain';
 import mainEvents from '@pkg/main/mainEvents';
 import type { IpcMainEvents, IpcMainInvokeEvents } from '@pkg/typings/electron-ipc';
 import * as childProcess from '@pkg/utils/childProcess';
+import fetch, { RequestInit } from '@pkg/utils/fetch';
 import Logging from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
 import { defined, RecursiveReadonly } from '@pkg/utils/typeUtils';
@@ -233,10 +234,6 @@ export class ExtensionManagerImpl implements ExtensionManager {
   }
 
   async init(config: RecursiveReadonly<Settings>) {
-    await Promise.all(Object.entries(config.extensions ?? {}).map(([id, install]) => {
-      return this.getExtension(id)[install ? 'install' : 'uninstall']();
-    }));
-
     this.setMainListener('extension/ui/dashboard', async(_, id) => {
       const extension = this.getExtension(id);
       const encodedID = id.replace(/./g, c => c.charCodeAt(0).toString(16));
@@ -286,6 +283,25 @@ export class ExtensionManagerImpl implements ExtensionManager {
 
       return Electron.dialog.showOpenDialog(options);
     });
+    this.setMainHandler('extension/vm/httpFetch', async(event, config) => {
+      const url = new URL(config.url);
+      const options: RequestInit = {
+        method:  config.method,
+        headers: config.headers ?? {},
+        body:    config.data,
+      };
+      const response = await fetch(url.toString(), options);
+
+      try {
+        return await response.json();
+      } catch (ex) {
+        return await response.text();
+      }
+    });
+
+    await Promise.all(Object.entries(config.extensions ?? {}).map(([id, install]) => {
+      return this.getExtension(id)[install ? 'install' : 'uninstall']();
+    }));
   }
 
   getExtension(id: string): Extension {

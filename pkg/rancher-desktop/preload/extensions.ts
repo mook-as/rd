@@ -217,7 +217,54 @@ class Client implements v1.DockerDesktopClient {
   }
 
   extension: v1.Extension = {
-    vm:    {} as v1.ExtensionVM,
+    vm: {
+      service: {
+        get: (url) => {
+          return this.extension.vm?.service?.request({
+            url, method: 'GET', headers: {}, data: undefined,
+          });
+        },
+        post(url, data) {
+          return this.request({
+            url, method: 'POST', headers: {}, data,
+          });
+        },
+        put(url, data) {
+          return this.request({
+            url, method: 'PUT', headers: {}, data,
+          });
+        },
+        patch(url, data) {
+          return this.request({
+            url, method: 'PATCH', headers: {}, data,
+          });
+        },
+        delete(url) {
+          return this.request({
+            url, method: 'DELETE', headers: {}, data: undefined,
+          });
+        },
+        head(url) {
+          return this.request({
+            url, method: 'HEAD', headers: {}, data: undefined,
+          });
+        },
+        request: async(config) => {
+          console.debug('Making API request', config);
+
+          try {
+            const result = await ipcRenderer.invoke('extension/vm/httpFetch', config);
+
+            console.debug(`${ config.url } response:`, result);
+
+            return result;
+          } catch (ex) {
+            console.debug(`${ config.url } error:`, ex);
+            throw ex;
+          }
+        },
+      },
+    } as v1.ExtensionVM,
     host:  { cli: { exec: getExec('host') } },
     image: extensionId,
   };

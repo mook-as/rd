@@ -118,6 +118,7 @@ export interface IpcMainInvokeEvents {
   'extension/spawn/blocking': (options: import('@pkg/main/extensions/types').SpawnOptions) => import('@pkg/main/extensions/types').SpawnResult;
   'extension/info': () => { platform: string, arch: string, hostname: string };
   'extension/dialog/showOpenDialog': (properties: import('electron').OpenDialogOptions) => import('electron').OpenDialogReturnValue;
+  'extension/vm/httpFetch': (config: import('@docker/extension-api-client-types').v1.RequestConfig) => any;
   // #endregion
 }
 
