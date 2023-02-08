@@ -5,6 +5,7 @@
 
 import type { ContainerEngineClient } from '@pkg/backend/containerEngine';
 import type { Settings } from '@pkg/config/settings';
+import type { RecursiveReadonly } from '@pkg/utils/typeUtils';
 
 export type ExtensionMetadata = {
   icon: string;
@@ -57,7 +58,7 @@ export interface Extension {
 export interface ExtensionManager {
   readonly client: ContainerEngineClient;
 
-  init(config: Settings): Promise<void>;
+  init(config: RecursiveReadonly<Settings>): Promise<void>;
 
   /**
    * Get the given extension.
