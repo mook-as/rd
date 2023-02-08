@@ -117,6 +117,7 @@ export interface IpcMainInvokeEvents {
   /** Execute the given command and return the results. */
   'extension/spawn/blocking': (options: import('@pkg/main/extensions/types').SpawnOptions) => import('@pkg/main/extensions/types').SpawnResult;
   'extension/info': () => { platform: string, arch: string, hostname: string };
+  'extension/dialog/showOpenDialog': (properties: import('electron').OpenDialogOptions) => import('electron').OpenDialogReturnValue;
   // #endregion
 }
 

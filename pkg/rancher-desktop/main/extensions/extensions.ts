@@ -277,6 +277,15 @@ export class ExtensionManagerImpl implements ExtensionManager {
       console.error(`Unexpected scope ${ options.scope }`);
       throw new Error(`Unexpected scope ${ options.scope }`);
     });
+    this.setMainHandler('extension/dialog/showOpenDialog', (event, options) => {
+      const window = Electron.BrowserWindow.fromWebContents(event.sender);
+
+      if (window) {
+        return Electron.dialog.showOpenDialog(window, options);
+      }
+
+      return Electron.dialog.showOpenDialog(options);
+    });
   }
 
   getExtension(id: string): Extension {

@@ -9,6 +9,7 @@ import { ipcRenderer } from '@pkg/utils/ipcRenderer';
 
 /* eslint-disable import/namespace -- that rule doesn't work with TypeScript type-only imports. */
 import type { v1 } from '@docker/extension-api-client-types';
+import type { OpenDialogOptions } from 'electron';
 
 function isSpawnOptions(options: v1.ExecOptions | v1.SpawnOptions): options is v1.SpawnOptions {
   return 'stream' in options;
@@ -221,7 +222,16 @@ class Client implements v1.DockerDesktopClient {
     image: extensionId,
   };
 
-  desktopUI: v1.DesktopUI = {} as any;
+  desktopUI: v1.DesktopUI = {
+    dialog: {
+      showOpenDialog(options: OpenDialogOptions): Promise<v1.OpenDialogResult> {
+        return ipcRenderer.invoke('extension/dialog/showOpenDialog', options ?? {});
+      },
+    },
+    navigate: {} as any,
+    toast:    {} as any,
+  };
+
   host: v1.Host = {
     openExternal: (url: string) => {
       ipcRenderer.send('extension/open-external', url);
