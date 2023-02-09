@@ -257,7 +257,11 @@ class Client implements v1.DockerDesktopClient {
 
             console.debug(`${ config.url } response:`, result);
 
-            return result;
+            try {
+              return JSON.parse(result);
+            } catch (ex) {
+              return result;
+            }
           } catch (ex) {
             console.debug(`${ config.url } error:`, ex);
             throw ex;
@@ -276,7 +280,17 @@ class Client implements v1.DockerDesktopClient {
       },
     },
     navigate: {} as any,
-    toast:    {} as any,
+    toast:    {
+      success(message) {
+        ipcRenderer.send('extension/ui/toast', 'success', String(message));
+      },
+      warning(message) {
+        ipcRenderer.send('extension/ui/toast', 'warning', String(message));
+      },
+      error(message) {
+        ipcRenderer.send('extension/ui/toast', 'error', String(message));
+      },
+    },
   };
 
   host: v1.Host = {

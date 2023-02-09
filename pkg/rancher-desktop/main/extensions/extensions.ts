@@ -283,6 +283,14 @@ export class ExtensionManagerImpl implements ExtensionManager {
 
       return Electron.dialog.showOpenDialog(options);
     });
+    this.setMainListener('extension/ui/toast', (event, level, message) => {
+      const notification = new Electron.Notification({
+        title: level.replace(/^./, c => c.toUpperCase()),
+        body:  message,
+      });
+
+      notification.show();
+    });
     this.setMainHandler('extension/vm/httpFetch', async(event, config) => {
       const url = new URL(config.url);
       const options: RequestInit = {
@@ -292,11 +300,7 @@ export class ExtensionManagerImpl implements ExtensionManager {
       };
       const response = await fetch(url.toString(), options);
 
-      try {
-        return await response.json();
-      } catch (ex) {
-        return await response.text();
-      }
+      return await response.text();
     });
 
     await Promise.all(Object.entries(config.extensions ?? {}).map(([id, install]) => {

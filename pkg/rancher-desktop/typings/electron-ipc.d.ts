@@ -71,6 +71,7 @@ export interface IpcMainEvents {
   'extension/spawn/kill': (id: string) => void;
   /** Launch the UI for a given extension. */
   'extension/ui/dashboard': (id: string) => void;
+  'extension/ui/toast': (level: 'success' | 'warning' | 'error', message: string) => void;
   /** Launch the given URL via the operating system (outside the app). */
   'extension/open-external': (url: string) => void;
   // #endregion
@@ -118,7 +119,7 @@ export interface IpcMainInvokeEvents {
   'extension/spawn/blocking': (options: import('@pkg/main/extensions/types').SpawnOptions) => import('@pkg/main/extensions/types').SpawnResult;
   'extension/info': () => { platform: string, arch: string, hostname: string };
   'extension/dialog/showOpenDialog': (properties: import('electron').OpenDialogOptions) => import('electron').OpenDialogReturnValue;
-  'extension/vm/httpFetch': (config: import('@docker/extension-api-client-types').v1.RequestConfig) => any;
+  'extension/vm/httpFetch': (config: import('@docker/extension-api-client-types').v1.RequestConfig) => string;
   // #endregion
 }
 
