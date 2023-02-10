@@ -220,34 +220,70 @@ class Client implements v1.DockerDesktopClient {
     vm: {
       service: {
         get: (url) => {
-          return this.extension.vm?.service?.request({
+          const result = this.extension.vm?.service?.request({
             url, method: 'GET', headers: {}, data: undefined,
           });
+
+          if (typeof result === 'undefined') {
+            throw new TypeError(`could not issue request`);
+          }
+
+          return result;
         },
-        post(url, data) {
-          return this.request({
+        post: (url, data) => {
+          const result = this.extension.vm?.service?.request({
             url, method: 'POST', headers: {}, data,
           });
+
+          if (typeof result === 'undefined') {
+            throw new TypeError(`could not issue request`);
+          }
+
+          return result;
         },
-        put(url, data) {
-          return this.request({
+        put: (url, data) => {
+          const result = this.extension.vm?.service?.request({
             url, method: 'PUT', headers: {}, data,
           });
+
+          if (typeof result === 'undefined') {
+            throw new TypeError(`could not issue request`);
+          }
+
+          return result;
         },
-        patch(url, data) {
-          return this.request({
+        patch: (url, data) => {
+          const result = this.extension.vm?.service?.request({
             url, method: 'PATCH', headers: {}, data,
           });
+
+          if (typeof result === 'undefined') {
+            throw new TypeError(`could not issue request`);
+          }
+
+          return result;
         },
-        delete(url) {
-          return this.request({
+        delete: (url) => {
+          const result = this.extension.vm?.service?.request({
             url, method: 'DELETE', headers: {}, data: undefined,
           });
+
+          if (typeof result === 'undefined') {
+            throw new TypeError(`could not issue request`);
+          }
+
+          return result;
         },
-        head(url) {
-          return this.request({
+        head: (url) => {
+          const result = this.extension.vm?.service?.request({
             url, method: 'HEAD', headers: {}, data: undefined,
           });
+
+          if (typeof result === 'undefined') {
+            throw new TypeError(`could not issue request`);
+          }
+
+          return result;
         },
         request: async(config) => {
           console.debug('Making API request', config);
@@ -268,7 +304,8 @@ class Client implements v1.DockerDesktopClient {
           }
         },
       },
-    } as v1.ExtensionVM,
+      cli: { exec: getExec('vm') },
+    },
     host:  { cli: { exec: getExec('host') } },
     image: extensionId,
   };
