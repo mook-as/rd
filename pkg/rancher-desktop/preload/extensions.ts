@@ -16,7 +16,7 @@ function isSpawnOptions(options: v1.ExecOptions | v1.SpawnOptions): options is v
 }
 
 /** execScope is a marker for execution scope for the exec() functions. */
-type execScope = 'vm' | 'host';
+type execScope = 'vm' | 'docker-cli' | 'host';
 
 // As Electron's contextBridge does not allow custom classes to be passed
 // through correctly, we instead create a template object and copy all of its
@@ -303,14 +303,33 @@ class Client implements v1.DockerDesktopClient {
   };
 
   docker = {
-    cli: { exec: getExec('host') },
-    listContainers() {
+    cli:            { exec: getExec('docker-cli') },
+    listContainers: async(options: {all?: boolean, limit?: number, size?: boolean, filters?: string} = {}) => {
+      const args = ['ls', '--format={{json .}}'];
 
-    },
-    listImages() {
+      args.push(`--all=${ options.all ?? false }`);
+      if ((options.limit ?? -1) > -1) {
+        args.push(`--last=${ options.limit }`);
+      }
+      args.push(`--size=${ options.size ?? false }`);
+      if (options.filters !== undefined) {
+        args.push(`--filter=${ options.filters }`);
+      }
 
+      return (await this.docker.cli.exec('container', args)).parseJsonObject();
     },
-  } as any;
+    listImages: async(options: {all?: boolean, filters?: string, digests?: boolean} = {}) => {
+      const args = ['ls', '--format={{json .}'];
+
+      args.push(`--all=${ options.all ?? false }`);
+      if (options.filters !== undefined) {
+        args.push(`--filter=${ options.filters }`);
+      }
+      args.push(`--digests=${ options.digests ?? false }`);
+
+      return (await this.docker.cli.exec('image', args)).parseJsonObject();
+    },
+  };
 }
 
 export default async function initExtensions(): Promise<void> {

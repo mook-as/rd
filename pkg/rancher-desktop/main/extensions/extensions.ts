@@ -14,6 +14,7 @@ import * as childProcess from '@pkg/utils/childProcess';
 import fetch, { RequestInit } from '@pkg/utils/fetch';
 import Logging from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
+import { executable } from '@pkg/utils/resources';
 import { defined, RecursiveReadonly } from '@pkg/utils/typeUtils';
 import { openExtension } from '@pkg/window';
 
@@ -24,6 +25,8 @@ import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron';
 
 const console = Logging.extensions;
 const ipcMain = getIpcMainProxy(console);
+
+/* eslint @typescript-eslint/switch-exhaustiveness-check: "error" */
 
 class ExtensionImpl implements Extension {
   constructor(id: string, client: ContainerEngineClient) {
@@ -254,6 +257,8 @@ export class ExtensionManagerImpl implements ExtensionManager {
       switch (options.scope) {
       case 'host':
         return this.spawnHostStreaming(event, options);
+      case 'docker-cli':
+        return this.spawnHostStreaming(event, this.convertDockerCliOptions(options));
       case 'vm':
         return;
       case 'container':
@@ -266,6 +271,8 @@ export class ExtensionManagerImpl implements ExtensionManager {
       switch (options.scope) {
       case 'host':
         return this.spawnHostBlocking(options);
+      case 'docker-cli':
+        return this.spawnHostBlocking(this.convertDockerCliOptions(options));
       case 'vm':
         return {} as any;
       case 'container':
@@ -304,7 +311,13 @@ export class ExtensionManagerImpl implements ExtensionManager {
     });
 
     await Promise.all(Object.entries(config.extensions ?? {}).map(([id, install]) => {
-      return this.getExtension(id)[install ? 'install' : 'uninstall']();
+      const op = install ? 'install' : 'uninstall';
+
+      try {
+        this.getExtension(id)[op]();
+      } catch (ex) {
+        console.error(`Failed to ${ op } extensino ${ id }`, ex);
+      }
     }));
   }
 
@@ -317,6 +330,13 @@ export class ExtensionManagerImpl implements ExtensionManager {
     }
 
     return ext;
+  }
+
+  protected convertDockerCliOptions(options: SpawnOptions): SpawnOptions {
+    return {
+      ...options,
+      command: [executable('docker'), ...options.command],
+    };
   }
 
   protected spawnHostBlocking(options: SpawnOptions): Promise<SpawnResult> {

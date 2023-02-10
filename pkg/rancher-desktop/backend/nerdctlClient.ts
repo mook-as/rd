@@ -136,7 +136,7 @@ export default class NerdctlClient implements ContainerEngineClient {
       const tar = process.platform === 'win32' ? path.join(process.env.SystemRoot ?? `C:\\Windows`, 'system32', 'tar.exe') : '/usr/bin/tar';
       const extractArgs = ['xzf', hostArchive, '-C', destinationDir];
 
-      await spawnFile(tar, extractArgs);
+      await spawnFile(tar, extractArgs, { stdio: console });
     } finally {
       await this.runCleanups(cleanups);
     }

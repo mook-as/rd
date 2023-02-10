@@ -92,7 +92,7 @@ export type SpawnOptions = {
    * The scope where the execution will take place; this is determined by which
    * API is being called.
    */
-  scope: 'host' | 'vm' | 'container';
+  scope: 'host' | 'docker-cli' | 'vm' | 'container';
   /**
    * Current working directory for the command.
    */
