@@ -223,17 +223,19 @@ export class ExtensionManagerImpl implements ExtensionManager {
       console.error(`Removing duplicate event listener for ${ channel }`);
       ipcMain.removeListener(channel, oldListener);
     }
-    ipcMain.on<K>(channel, listener);
+    this.eventListeners[channel] = listener as any;
+    ipcMain.on(channel, listener);
   }
 
-  protected setMainHandler<K extends keyof IpcMainInvokeEvents>(channel: K, listener: IpcMainEventHandler<K>) {
+  protected setMainHandler<K extends keyof IpcMainInvokeEvents>(channel: K, handler: IpcMainEventHandler<K>) {
     const oldHandler = this.eventHandlers[channel];
 
     if (oldHandler) {
       console.error(`Removing duplicate event listener for ${ channel }`);
       ipcMain.removeHandler(channel);
     }
-    ipcMain.handle<K>(channel, listener);
+    this.eventHandlers[channel] = handler as any;
+    ipcMain.handle(channel, handler);
   }
 
   async init(config: RecursiveReadonly<Settings>) {
@@ -256,7 +258,7 @@ export class ExtensionManagerImpl implements ExtensionManager {
     this.setMainListener('extension/spawn/streaming', (event, options) => {
       switch (options.scope) {
       case 'host':
-        return this.spawnHostStreaming(event, options);
+        return this.spawnHostStreaming(event, this.convertHostOptions(options));
       case 'docker-cli':
         return this.spawnHostStreaming(event, this.convertDockerCliOptions(options));
       case 'vm':
@@ -270,7 +272,7 @@ export class ExtensionManagerImpl implements ExtensionManager {
     this.setMainHandler('extension/spawn/blocking', (event, options) => {
       switch (options.scope) {
       case 'host':
-        return this.spawnHostBlocking(options);
+        return this.spawnHostBlocking(this.convertHostOptions(options));
       case 'docker-cli':
         return this.spawnHostBlocking(this.convertDockerCliOptions(options));
       case 'vm':
@@ -332,6 +334,17 @@ export class ExtensionManagerImpl implements ExtensionManager {
     return ext;
   }
 
+  protected convertHostOptions(options: SpawnOptions): SpawnOptions {
+    const extension = this.getExtension(options.extension) as ExtensionImpl;
+    const exeExtension = process.platform === 'win32' ? '.exe' : '';
+    const exePath = path.join(extension.dir, 'bin', options.command[0]) + exeExtension;
+
+    return {
+      ...options,
+      command: [exePath, ...options.command.slice(1)],
+    };
+  }
+
   protected convertDockerCliOptions(options: SpawnOptions): SpawnOptions {
     return {
       ...options,
@@ -340,12 +353,15 @@ export class ExtensionManagerImpl implements ExtensionManager {
   }
 
   protected spawnHostBlocking(options: SpawnOptions): Promise<SpawnResult> {
-    const extension = this.getExtension(options.extension) as ExtensionImpl;
-    const exeExtension = process.platform === 'win32' ? '.exe' : '';
-    const exePath = path.join(extension.dir, 'bin', options.command[0]) + exeExtension;
+    const args = options.command.concat();
+    const exePath = args.shift();
+
+    if (!exePath) {
+      throw new Error(`no executable given`);
+    }
 
     return new Promise((resolve) => {
-      childProcess.execFile(exePath, options.command.slice(1), { ..._.pick(options, ['cwd', 'env']) }, (error, stdout, stderr) => {
+      childProcess.execFile(exePath, args, { ..._.pick(options, ['cwd', 'env']) }, (error, stdout, stderr) => {
         resolve({
           command: options.command.join(' '),
           killed:  true,
@@ -358,10 +374,14 @@ export class ExtensionManagerImpl implements ExtensionManager {
   }
 
   protected spawnHostStreaming(event: IpcMainEvent, options: SpawnOptions) {
-    const extension = this.getExtension(options.extension) as ExtensionImpl;
-    const exeExtension = process.platform === 'win32' ? '.exe' : '';
-    const exePath = path.join(extension.dir, 'bin', options.command[0]) + exeExtension;
-    const proc = childProcess.spawn(exePath, options.command.slice(1), {
+    const args = options.command.concat();
+    const exePath = args.shift();
+
+    if (!exePath) {
+      throw new Error(`no executable given`);
+    }
+
+    const proc = childProcess.spawn(exePath, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
       ..._.pick(options, ['cwd', 'env']),
     });
