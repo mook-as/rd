@@ -305,7 +305,7 @@ class Client implements v1.DockerDesktopClient {
   docker = {
     cli:            { exec: getExec('docker-cli') },
     listContainers: async(options: {all?: boolean, limit?: number, size?: boolean, filters?: string} = {}) => {
-      const args = ['ls', '--format={{json .}}'];
+      const args = ['ls', '--format={{json .}}', '--no-trunc'];
 
       args.push(`--all=${ options.all ?? false }`);
       if ((options.limit ?? -1) > -1) {
@@ -316,10 +316,16 @@ class Client implements v1.DockerDesktopClient {
         args.push(`--filter=${ options.filters }`);
       }
 
-      return (await this.docker.cli.exec('container', args)).parseJsonObject();
+      const result = await this.docker.cli.exec('container', args);
+
+      if (result.code || result.signal) {
+        throw new Error(`failed to list containers: ${ result.stderr }`);
+      }
+
+      return result.parseJsonLines();
     },
     listImages: async(options: {all?: boolean, filters?: string, digests?: boolean} = {}) => {
-      const args = ['ls', '--format={{json .}'];
+      const args = ['ls', '--format={{json .}}', '--no-trunc'];
 
       args.push(`--all=${ options.all ?? false }`);
       if (options.filters !== undefined) {
@@ -327,7 +333,15 @@ class Client implements v1.DockerDesktopClient {
       }
       args.push(`--digests=${ options.digests ?? false }`);
 
-      return (await this.docker.cli.exec('image', args)).parseJsonObject();
+      console.debug(`list images command line`, args);
+
+      const result = await this.docker.cli.exec('image', args);
+
+      if (result.code || result.signal) {
+        throw new Error(`failed to list images: ${ result.stderr }`);
+      }
+
+      return result.parseJsonLines();
     },
   };
 }
