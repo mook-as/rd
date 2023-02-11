@@ -20,6 +20,7 @@ export default class NerdctlClient implements ContainerEngineClient {
 
   /** The VM backing Rancher Desktop */
   vm: VMExecutor;
+  readonly executable = executable('nerdctl');
 
   /**
    * Run nerdctl with the given arguments, returning the standard output.

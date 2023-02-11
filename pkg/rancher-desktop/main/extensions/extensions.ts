@@ -72,7 +72,7 @@ class ExtensionImpl implements Extension {
     return this._iconName as Promise<string>;
   }
 
-  protected get containerName() {
+  get containerName() {
     return `rd-extension.${ this.id.replaceAll('/', '.').replace(/[^a-zA-Z0-9_.-]/g, '_') }`;
   }
 
@@ -255,30 +255,26 @@ export class ExtensionManagerImpl implements ExtensionManager {
       Electron.shell.openExternal(url);
     });
 
-    this.setMainListener('extension/spawn/streaming', (event, options) => {
+    this.setMainListener('extension/spawn/streaming', async(event, options) => {
       switch (options.scope) {
       case 'host':
         return this.spawnHostStreaming(event, this.convertHostOptions(options));
       case 'docker-cli':
         return this.spawnHostStreaming(event, this.convertDockerCliOptions(options));
-      case 'vm':
-        return;
       case 'container':
-        return;
+        return this.spawnHostStreaming(event, await this.convertContainerOptions(options));
       }
       console.error(`Unexpected scope ${ options.scope }`);
       throw new Error(`Unexpected scope ${ options.scope }`);
     });
-    this.setMainHandler('extension/spawn/blocking', (event, options) => {
+    this.setMainHandler('extension/spawn/blocking', async(event, options) => {
       switch (options.scope) {
       case 'host':
         return this.spawnHostBlocking(this.convertHostOptions(options));
       case 'docker-cli':
         return this.spawnHostBlocking(this.convertDockerCliOptions(options));
-      case 'vm':
-        return {} as any;
       case 'container':
-        return {} as any;
+        return this.spawnHostBlocking(await this.convertContainerOptions(options));
       }
       console.error(`Unexpected scope ${ options.scope }`);
       throw new Error(`Unexpected scope ${ options.scope }`);
@@ -352,6 +348,32 @@ export class ExtensionManagerImpl implements ExtensionManager {
     };
   }
 
+  protected async convertContainerOptions(options: SpawnOptions): Promise<SpawnOptions> {
+    const prefixArgs = ['container', 'exec'];
+    const extension = this.getExtension(options.extension) as ExtensionImpl;
+    const metadata = await extension.metadata;
+
+    if (options.cwd) {
+      prefixArgs.push(`--workdir=${ options.cwd }`);
+    }
+    for (const [key, value] of Object.entries(options.env ?? {})) {
+      prefixArgs.push(`--env=${ key }=${ value }`);
+    }
+
+    if ('image' in metadata.vm) {
+      prefixArgs.push(extension.containerName);
+    } else if ('composefile' in metadata.vm) {
+      throw new Error('Compose-based extensions not supported');
+    } else {
+      throw new Error('no container specified in metadata, cannot exec()');
+    }
+
+    return {
+      ...options,
+      command: [this.client.executable, ...prefixArgs, ...options.command],
+    };
+  }
+
   protected spawnHostBlocking(options: SpawnOptions): Promise<SpawnResult> {
     const args = options.command.concat();
     const exePath = args.shift();
@@ -408,10 +430,6 @@ export class ExtensionManagerImpl implements ExtensionManager {
         event.senderFrame.send('extension/spawn/error', options.id, signal);
       }
     });
-  }
-
-  protected spawnVM(command: string[], options: SpawnOptions) {
-
   }
 
   shutdown() {

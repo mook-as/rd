@@ -16,7 +16,7 @@ function isSpawnOptions(options: v1.ExecOptions | v1.SpawnOptions): options is v
 }
 
 /** execScope is a marker for execution scope for the exec() functions. */
-type execScope = 'vm' | 'docker-cli' | 'host';
+type execScope = 'container' | 'docker-cli' | 'host';
 
 // As Electron's contextBridge does not allow custom classes to be passed
 // through correctly, we instead create a template object and copy all of its
@@ -304,7 +304,7 @@ class Client implements v1.DockerDesktopClient {
           }
         },
       },
-      cli: { exec: getExec('vm') },
+      cli: { exec: getExec('container') },
     },
     host:  { cli: { exec: getExec('host') } },
     image: extensionId,

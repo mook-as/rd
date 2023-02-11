@@ -65,5 +65,11 @@ export interface ContainerEngineClient {
    */
   run(imageID: string, options?: ContainerRunOptions): Promise<string>;
 
+  /**
+   * Stop the given container, if it exists and is running.
+   */
   stop(container: string, options?: ContainerStopOptions): Promise<void>;
+
+  /** Escape hatch (for now): the executable to run */
+  readonly executable: string;
 }
