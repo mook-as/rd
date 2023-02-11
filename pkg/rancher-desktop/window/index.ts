@@ -145,6 +145,7 @@ export function openExtension(id: string, url: string) {
     {
       width:          800,
       height:         600,
+      parent: getWindow('main') ?? undefined,
       webPreferences: {
         devTools:         true,
         nodeIntegration:  false,
