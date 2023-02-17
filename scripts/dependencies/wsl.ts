@@ -94,7 +94,7 @@ export class HostResolverHost implements Dependency, GithubDependency {
 
 export class WSLDistro implements Dependency, GithubDependency {
   name = 'WSLDistro';
-  githubOwner = 'rancher-sandbox';
+  githubOwner = 'tperale';
   githubRepo = 'rancher-desktop-wsl-distro';
 
   async download(context: DownloadContext): Promise<void> {

@@ -20,6 +20,7 @@ export const defaultTransientSettings = {
       currentTabs: {
         Application:        'general',
         'Container Engine': 'general',
+        WSL:                'integration',
       } as Record<NavItemName, string | undefined>,
     },
   },

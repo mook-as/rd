@@ -953,6 +953,9 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
       await k8smanager.executor.execCommand({ root: true }, 'rm', '-f', imageAllowListConf);
     }
 
+    // Update the values that doesn't need a restart of the backend.
+    await k8smanager.handleUpdatesSettings(cfg);
+
     // Check if the newly applied preferences demands a restart of the backend.
     const restartReasons = await k8smanager.requiresRestartReasons(cfg);
 

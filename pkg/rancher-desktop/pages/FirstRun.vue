@@ -41,6 +41,12 @@
       :container-engine="settings.containerEngine.name"
       @change="onChangeEngine"
     />
+    <wsl-proxy
+      v-if="proxyRelevant"
+      :preferences="settings"
+      emit-changes
+      @change="onChangeProxy"
+    />
     <path-management-selector
       v-if="pathManagementRelevant"
       :value="pathManagementStrategy"
@@ -68,6 +74,7 @@ import { mapGetters } from 'vuex';
 import { VersionEntry } from '@pkg/backend/k8s';
 import EngineSelector from '@pkg/components/EngineSelector.vue';
 import PathManagementSelector from '@pkg/components/PathManagementSelector.vue';
+import WslProxy from '@pkg/components/WSLProxy.vue';
 import { defaultSettings } from '@pkg/config/settings';
 import type { ContainerEngine } from '@pkg/config/settings';
 import { PathManagementStrategy } from '@pkg/integrations/pathManager';
@@ -75,7 +82,7 @@ import { ipcRenderer } from '@pkg/utils/ipcRenderer';
 
 export default Vue.extend({
   components: {
-    Checkbox, EngineSelector, PathManagementSelector,
+    Checkbox, EngineSelector, PathManagementSelector, WslProxy,
   },
   layout: 'dialog',
   data() {
@@ -112,6 +119,9 @@ export default Vue.extend({
     },
     pathManagementRelevant(): boolean {
       return os.platform() === 'linux' || os.platform() === 'darwin';
+    },
+    proxyRelevant(): boolean {
+      return os.platform() === 'win32';
     },
   },
   mounted() {
@@ -154,6 +164,16 @@ export default Vue.extend({
         ipcRenderer.invoke(
           'settings-write',
           { containerEngine: { name: desiredEngine } },
+        );
+      } catch (err) {
+        console.log('invoke settings-write failed: ', err);
+      }
+    },
+    onChangeProxy(desiredProxySettings: any) {
+      try {
+        ipcRenderer.invoke(
+          'settings-write',
+          { WSL: { proxy: desiredProxySettings } },
         );
       } catch (err) {
         console.log('invoke settings-write failed: ', err);

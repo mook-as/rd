@@ -4676,6 +4676,22 @@ integrations:
     description: "Expose Rancher Desktop's Kubernetes configuration and Docker socket to Windows Subsystem for Linux (WSL) distros"
 
 ##############################
+### Proxy Page
+##############################
+proxy:
+  windows:
+    title: WSL Proxy
+    description: "Configure the proxy used by rancher-desktop"
+    addressTitle: "Proxy address"
+    address: "Address"
+    port: "Port"
+    authTitle: "Authentication information"
+    username: "Username"
+    password: "Password"
+    noProxyTitle: "Set the 'NOPROXY' variable to do not use the proxy for some domains"
+    noProxy: "NOPROXY"
+
+##############################
 ### Support Page
 ##############################
 

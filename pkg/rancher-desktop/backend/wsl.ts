@@ -709,6 +709,20 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
     }
   }
 
+  protected async writeProxySettings(proxy: any): Promise<void> {
+    if (proxy.address && proxy.port) {
+      // Write to /etc/moproxy/proxy.ini
+      const address = `${ proxy.address }:${ proxy.port }`;
+      const contents = `[rancher-desktop-proxy]\naddress=${ address }\nprotocol=http\n`;
+      const username = proxy.username ? `http username=${ proxy.username }\n` : '';
+      const password = proxy.password ? `http password=${ proxy.password }\n` : '';
+
+      await this.writeFile(`/etc/moproxy/proxy.ini`, `${ contents }${ username }${ password }`);
+    } else {
+      await this.writeFile(`/etc/moproxy/proxy.ini`, '; no proxy');
+    }
+  }
+
   /**
    * handleUpgrade removes all the left over files that
    * were renamed in between releases.
@@ -1040,15 +1054,36 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
   }
 
   /**
+   * Execute a command on a given OpenRC service.
+   *
+   * @param service The name of the OpenRC service to execute.
+   * @param action The name of the OpenRC service action to execute.
+   * @param update Whether or not to run `rc-update` before executing the service command.
+   */
+  async execService(service: string, action: string, update = false) {
+    if (update) {
+      await this.execCommand('/sbin/rc-update', '--update');
+    }
+    await this.execCommand('/usr/local/bin/wsl-service', service, action);
+  }
+
+  /**
    * Start the given OpenRC service.  This should only happen after
    * provisioning, to ensure that provisioning can modify any configuration.
    *
    * @param service The name of the OpenRC service to execute.
    */
   async startService(service: string) {
-    // Run rc-update as we have dynamic dependencies.
-    await this.execCommand('/sbin/rc-update', '--update');
-    await this.execCommand('/usr/local/bin/wsl-service', service, 'start');
+    await this.execService(service, 'start', true);
+  }
+
+  /**
+   * Stop the given OpenRC service.
+   *
+   * @param service The name of the OpenRC service to stop.
+   */
+  async stopService(service: string) {
+    await this.execService(service, 'stop');
   }
 
   /**
@@ -1186,6 +1221,9 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
                 await this.writeFile(`/etc/init.d/buildkitd`, SERVICE_BUILDKITD_INIT, 0o755);
                 await this.writeFile(`/etc/conf.d/buildkitd`, SERVICE_BUILDKITD_CONF);
               }),
+              this.progressTracker.action('Proxy Config Setup', 50, async() => {
+                await this.writeProxySettings(config.WSL.proxy);
+              }),
               this.progressTracker.action('Configuring image proxy', 50, async() => {
                 const imageAllowListConf = '/usr/local/openresty/nginx/conf/image-allow-list.conf';
                 const resolver = `resolver ${ await this.ipAddress } ipv6=off;\n`;
@@ -1246,6 +1284,10 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
         }
 
         await this.progressTracker.action('Running provisioning scripts', 100, this.runProvisioningScripts());
+
+        if (config.WSL.proxy.enabled && config.WSL.proxy.address && config.WSL.proxy.port) {
+          await this.progressTracker.action('Starting proxy', 100, this.execCommand('/usr/local/bin/wsl-service', '--ifnotstarted', 'moproxy', 'start'));
+        }
         if (config.containerEngine.imageAllowList.enabled) {
           await this.progressTracker.action('Starting image proxy', 100, this.startService('openresty'));
         }
@@ -1436,6 +1478,23 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
       }
       await this.start(config);
     });
+  }
+
+  async handleUpdatesSettings(newConfig: RecursivePartial<BackendSettings>): Promise<void> {
+    if (!newConfig.WSL) {
+      return;
+    }
+    const proxy = newConfig.WSL.proxy;
+
+    if (proxy) {
+      this.writeProxySettings(proxy);
+      if (proxy.enabled && proxy.address && proxy.port) {
+        await this.execCommand('/usr/local/bin/wsl-service', '--ifstarted', 'moproxy', 'reload');
+        await this.execCommand('/usr/local/bin/wsl-service', '--ifnotstarted', 'moproxy', 'start');
+      } else {
+        await this.execCommand('/usr/local/bin/wsl-service', '--ifstarted', 'moproxy', 'stop');
+      }
+    }
   }
 
   // The WSL implementation of requiresRestartReasons doesn't need to do

@@ -70,7 +70,12 @@ export const defaultSettings = {
      */
     hostResolver: true,
   },
-  WSL:        { integrations: {} as Record<string, boolean> },
+  WSL: {
+    integrations: {} as Record<string, boolean>,
+    proxy:        {
+      enabled: false, address: '', noProxy: '', password: '', port: 3128, username: '',
+    },
+  },
   kubernetes: {
     /** The version of Kubernetes to launch, as a semver (without v prefix). */
     version: '',

@@ -36,8 +36,18 @@ describe('updateFromCommandLine', () => {
         hostResolver: true,
       },
       experimental: { virtualMachine: { socketVMNet: true } },
-      WSL:          { integrations: {} },
-      kubernetes:   {
+      WSL:          {
+        integrations: {},
+        proxy:        {
+          enabled:  false,
+          address:  '',
+          noProxy:  '',
+          password: '',
+          port:     3128,
+          username: '',
+        },
+      },
+      kubernetes: {
         version: '1.23.5',
         port:    6443,
         enabled: true,

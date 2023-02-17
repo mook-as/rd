@@ -300,8 +300,30 @@ describe(SettingsValidator, () => {
       it('should allow being changed', () => {
         const [needToUpdate, errors] = subject.validateSettings({
           ...cfg,
-          WSL: { integrations: { distribution: false } },
-        }, { WSL: { integrations: { distribution: true } } });
+          WSL: {
+            integrations: { distribution: false },
+            proxy:        {
+              enabled:  false,
+              address:  '',
+              noProxy:  '',
+              password: '',
+              port:     3128,
+              username: '',
+            },
+          },
+        }, {
+          WSL: {
+            integrations: { distribution: true },
+            proxy:        {
+              enabled:  false,
+              address:  '',
+              noProxy:  '',
+              password: '',
+              port:     3128,
+              username: '',
+            },
+          },
+        });
 
         expect({ needToUpdate, errors }).toEqual({
           needToUpdate: true,

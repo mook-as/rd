@@ -79,8 +79,18 @@ export default class SettingsValidator {
         hostResolver: this.checkPlatform('win32', this.checkBoolean),
       },
       experimental: { virtualMachine: { socketVMNet: this.checkPlatform('darwin', this.checkBoolean) } },
-      WSL:          { integrations: this.checkPlatform('win32', this.checkBooleanMapping) },
-      kubernetes:   {
+      WSL:          {
+        integrations: this.checkPlatform('win32', this.checkBooleanMapping),
+        proxy:        {
+          enabled:  this.checkBoolean,
+          address:  this.checkString,
+          noProxy:  this.checkString,
+          password: this.checkString,
+          port:     this.checkNumber(1, 65535),
+          username: this.checkString,
+        },
+      },
+      kubernetes: {
         version: this.checkKubernetesVersion,
         port:    this.checkNumber(1, 65535),
         enabled: this.checkBoolean,
