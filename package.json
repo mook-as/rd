@@ -132,7 +132,7 @@
     "babel-core": "7.0.0-bridge.0",
     "css-loader": "4.3.0",
     "ejs": "3.1.9",
-    "electron": "20.3.8",
+    "electron": "25.1.0",
     "electron-builder": "23.6.0",
     "electron-notarize": "1.2.2",
     "eslint": "8.39.0",
