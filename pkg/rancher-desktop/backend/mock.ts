@@ -8,7 +8,9 @@ import semver from 'semver';
 import {
   BackendSettings, execOptions, State, RestartReasons, VMExecutor, BackendEvents,
 } from './backend';
-import { ContainerBasicOptions, ContainerComposeExecOptions, ContainerComposeOptions, ContainerComposePortOptions, ContainerEngineClient, ContainerRunClientOptions, ContainerRunOptions, ContainerStopOptions, ReadableProcess } from './containerClient';
+import {
+  ContainerBasicOptions, ContainerComposeExecOptions, ContainerComposeOptions, ContainerComposePortOptions, ContainerEngineClient, ContainerRunClientOptions, ContainerRunOptions, ContainerStopOptions, ReadableProcess,
+} from './containerClient';
 import { KubernetesBackend, KubernetesError, KubernetesBackendEvents } from './k8s';
 import ProgressTracker from './progressTracker';
 
@@ -253,43 +255,52 @@ class MockContainerEngineClient implements ContainerEngineClient {
   waitForReady(): Promise<void> {
     return Promise.resolve();
   }
+
   readFile(imageID: string, filePath: string): Promise<string>;
   readFile(imageID: string, filePath: string, options: { encoding?: BufferEncoding | undefined; namespace?: string | undefined; }): Promise<string>;
   readFile(imageID: string, filePath: string, options?: unknown): Promise<string> {
     throw new Error('Method not implemented.');
   }
+
   copyFile(imageID: string, sourcePath: string, destinationDir: string): Promise<void>;
   copyFile(imageID: string, sourcePath: string, destinationDir: string, options: { namespace?: string | undefined; }): Promise<void>;
   copyFile(imageID: unknown, sourcePath: unknown, destinationDir: unknown, options?: unknown): Promise<void> {
     throw new Error('Method not implemented.');
   }
+
   getTags(imageName: string, options?: ContainerBasicOptions | undefined): Promise<Set<string>> {
     throw new Error('Method not implemented.');
   }
+
   run(imageID: string, options?: ContainerRunOptions | undefined): Promise<string> {
     throw new Error('Method not implemented.');
   }
+
   stop(container: string, options?: ContainerStopOptions | undefined): Promise<void> {
     throw new Error('Method not implemented.');
   }
+
   composeUp(options: ContainerComposeOptions): Promise<void> {
     throw new Error('Method not implemented.');
   }
+
   composeDown(options?: ContainerComposeOptions | undefined): Promise<void> {
     throw new Error('Method not implemented.');
   }
+
   composeExec(options: ContainerComposeExecOptions): Promise<ReadableProcess> {
     throw new Error('Method not implemented.');
   }
+
   composePort(options: ContainerComposePortOptions): Promise<string> {
     throw new Error('Method not implemented.');
   }
+
   runClient(args: string[], stdio?: 'ignore' | undefined, options?: ContainerRunClientOptions | undefined): Promise<Record<string, never>>;
   runClient(args: string[], stdio: Log, options?: ContainerRunClientOptions | undefined): Promise<Record<string, never>>;
   runClient(args: string[], stdio: 'pipe', options?: ContainerRunClientOptions | undefined): Promise<{ stdout: string; stderr: string; }>;
   runClient(args: string[], stdio: 'stream', options?: ContainerRunClientOptions | undefined): ReadableProcess;
-  runClient(args: unknown, stdio?: unknown, options?: unknown): import("./containerClient").ReadableProcess | Promise<Record<string, never>> | Promise<{ stdout: string; stderr: string; }> {
-    return Promise.resolve({stdout: '', stderr: ''});
+  runClient(args: unknown, stdio?: unknown, options?: unknown): import('./containerClient').ReadableProcess | Promise<Record<string, never>> | Promise<{ stdout: string; stderr: string; }> {
+    return Promise.resolve({ stdout: '', stderr: '' });
   }
-
 }

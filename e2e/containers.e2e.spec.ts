@@ -1,14 +1,13 @@
 import os from 'os';
-import path from 'path';
 
 import { test, expect, _electron } from '@playwright/test';
 
 import { NavPage } from './pages/nav-page';
-import { createDefaultSettings, reportAsset, teardown, tool } from './utils/TestUtils';
+import { createDefaultSettings, startRancherDesktop, teardown, tool } from './utils/TestUtils';
 
 import { Settings } from '@pkg/config/settings';
 
-import type { ElectronApplication, BrowserContext, Page } from '@playwright/test';
+import type { ElectronApplication, Page } from '@playwright/test';
 
 let page: Page;
 
@@ -18,28 +17,11 @@ let page: Page;
  * */
 test.describe.serial('Container Engine', () => {
   let electronApp: ElectronApplication;
-  let context: BrowserContext;
 
   test.beforeAll(async() => {
     createDefaultSettings({ application: { adminAccess: false } });
 
-    electronApp = await _electron.launch({
-      args: [
-        path.join(__dirname, '../'),
-        '--disable-gpu',
-        '--whitelisted-ips=',
-        // See pkg/rancher-desktop/utils/commandLine.ts before changing the next item as the final option.
-        '--disable-dev-shm-usage',
-        '--no-modal-dialogs',
-      ],
-      env: {
-        ...process.env,
-        RD_LOGS_DIR: reportAsset(__filename, 'log'),
-      },
-    });
-    context = electronApp.context();
-
-    await context.tracing.start({ screenshots: true, snapshots: true });
+    electronApp = await startRancherDesktop(__filename, { mock: false });
     page = await electronApp.firstWindow();
   });
 
