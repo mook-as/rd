@@ -163,7 +163,7 @@ export async function teardownApp(app: ElectronApplication) {
     }
     // Try to do platform-specific killing based on process groups
     if (process.platform === 'darwin' || process.platform === 'linux') {
-      while (true) {
+      for (const signal of ['TERM', 'TERM', 'TERM', 'KILL']) {
         let pids = '';
 
         try {
@@ -178,7 +178,7 @@ export async function teardownApp(app: ElectronApplication) {
         try {
           if (pids.trim()) {
             console.log(`Manually killing group processes ${ pids.replace(/\r?\n/g, ' ').trim() }`);
-            await childProcess.spawnFile('kill', ['TERM'].concat(...pids.split(/\s+/).filter(p => p)));
+            await childProcess.spawnFile('kill', ['-s', signal].concat(...pids.split(/\s+/).filter(p => p)));
           }
         } catch (ex) {
           console.log(`Failed to process group: ${ ex } (retrying)`);
