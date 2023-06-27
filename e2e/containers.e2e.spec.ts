@@ -6,6 +6,7 @@ import { NavPage } from './pages/nav-page';
 import { createDefaultSettings, startRancherDesktop, teardown, tool } from './utils/TestUtils';
 
 import { Settings } from '@pkg/config/settings';
+import { reopenLogs } from '@pkg/utils/logging';
 
 import type { ElectronApplication, Page } from '@playwright/test';
 
@@ -17,6 +18,11 @@ let page: Page;
  * */
 test.describe.serial('Container Engine', () => {
   let electronApp: ElectronApplication;
+
+  test.beforeAll(async() => {
+    await tool('rdctl', 'factory-reset', '--verbose');
+    reopenLogs();
+  });
 
   test.beforeAll(async() => {
     createDefaultSettings({ application: { adminAccess: false } });
