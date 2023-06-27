@@ -187,7 +187,7 @@ export async function teardown(app: ElectronApplication, filename: string) {
   if (testInfo?.testPath === filename) {
     const delta = (Date.now() - testInfo.startTime) / 1_000;
     const min = Math.floor(delta / 60);
-    const sec = delta % 60;
+    const sec = Math.round(delta % 60);
     const string = min ? `${ min } min ${ sec } sec` : `${ sec } seconds`;
 
     console.log(`Test ${ path.basename(filename) } took ${ string }.`);
