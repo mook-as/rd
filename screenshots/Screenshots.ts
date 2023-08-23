@@ -58,7 +58,7 @@ export class Screenshots {
       return `screencapture -o -l $(GetWindowID  "${ this.appBundleTitle }" "${ this.windowTitle }") ${ file }`;
     }
     if (os.platform() === 'win32') {
-      return `${ path.resolve(process.cwd(), 'resources', 'ShareX', 'sharex') } -p -s -ActiveWindow`;
+      return `${ path.resolve(process.cwd(), 'resources', 'ShareX', 'sharex') } -AutoClose -p -s -ActiveWindow`;
     }
 
     return `gnome-screenshot -w -f ${ file }`;
@@ -108,9 +108,11 @@ export class MainWindowScreenshots extends Screenshots {
     this.windowTitle = 'Rancher Desktop';
   }
 
+  async take(tabName: Parameters<NavPage['navigateTo']>[0], navPage: NavPage, timeout?: number): Promise<void>;
+  async take(tabName: string, navPage?: undefined, timeout?: number): Promise<void>;
   async take(tabName: string, navPage?: NavPage, timeout = 200) {
     if (navPage) {
-      await navPage.navigateTo(tabName as any);
+      await navPage.navigateTo(tabName as Parameters<NavPage['navigateTo']>[0]);
       await this.page.waitForTimeout(timeout);
     }
 
