@@ -1,0 +1,52 @@
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version override
+        required: false
+        type: string
+
+jobs:
+  screenshots:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - platform: darwin
+          arch: x86_64
+          runs-on: macsos-latest
+        - platform: linux
+          arch: x86_64
+          runs-on: ubuntu-latest
+        - platform: win32
+          arch: x86_64
+          runs-on: windows-latest
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        persist-credentials: false
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '16.x'
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+    - uses: actions/setup-go@v4
+      with:
+        go-version: '^1.18'
+    - name: Install Windows dependencies
+      if: runner.os == 'Windows'
+      shell: powershell
+      run: .\scripts\windows-setup.ps1 -SkipVisualStudio -SkipTools
+    - name: Flag build for M1
+      if: matrix.arch == 'aarch64' && matrix.platform == 'mac'
+      run: echo "M1=1" >> "${GITHUB_ENV}"
+      # Needs a network timeout for macos & windows. See https://github.com/yarnpkg/yarn/issues/8242 for more info
+    - run: yarn install --frozen-lockfile --network-timeout 1000000
+    - run: yarn screenshots
+    - uses: actions/upload-artifact@v3
+      with:
+        name: screenshots-${{ matrix.platform }}.zip
+        path: screenshots/output/${{ matrix.platform }}
+        if-no-files-found: error
