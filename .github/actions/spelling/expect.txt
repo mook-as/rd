@@ -453,6 +453,7 @@ MSFT
 msiexec
 MSIINSTALLPERUSER
 msize
+MSIX
 MSRDC
 msvs
 mszip
@@ -803,6 +804,7 @@ WSLg
 wslify
 WSLIs
 WSLKERNELINSTALLED
+wslutils
 WWID
 wwn
 xauth
