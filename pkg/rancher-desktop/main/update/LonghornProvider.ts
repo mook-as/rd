@@ -4,11 +4,11 @@ import path from 'path';
 import { URL } from 'url';
 import util from 'util';
 
-import * as childProcess from '@pkg/utils/childProcess';
 import fetch from '@pkg/utils/fetch';
 import Logging from '@pkg/utils/logging';
 import { getMacOsVersion } from '@pkg/utils/osVersion';
 import paths from '@pkg/utils/paths';
+import getWSLVersion from '@pkg/utils/wslVersion';
 import { newError, CustomPublishOptions } from 'builder-util-runtime';
 import Electron from 'electron';
 import { AppUpdater, Provider, ResolvedUpdateFileInfo, UpdateInfo } from 'electron-updater';
@@ -243,48 +243,26 @@ function getPlatformVersion(): string {
   throw new Error(`Platform "${ process.platform }" is not supported`);
 }
 
-// Getting WSL version is a complex process. There are two ways that
-// WSL is installed on a system:
-//
-// 1. "In-box" or "feature" versions come with the OS, and have version
-//    numbers that correlate with the OS version. In-box versions do not
-//    have a --version flag.
-// 2. "Application" versions are installed via the Windows app store,
-//    and have version numbers that are independent of the OS. They have
-//    a --version flag.
-//
-// It is possible to have an in-box and an application version of WSL
-// installed simultaneously. If this is the case, the application version
-// always takes precedence.
-//
-// Because the version of an in-box installation of WSL is both difficult
-// to get and not useful, we only try to get the version of any application
-// installation of WSL. If this fails for whatever reason, this function
-// returns undefined.
-export async function getWslVersion(): Promise<string | undefined> {
-  const args = ['--version'];
-  let stdout: string;
-
+/**
+ * Get the installed WSL version as a string.  If the inbox version of WSL is
+ * installed (rather than the store version), we just hard code "1.0.0" instead.
+ * @note This function should never throw;
+ */
+export async function getWslVersionString(): Promise<string | undefined> {
   try {
-    const result = await childProcess.spawnFile('wsl.exe', args, {
-      encoding: 'utf16le',
-      stdio:    ['ignore', 'pipe', console],
-    });
+    const { installed, inbox, version } = await getWSLVersion();
 
-    stdout = result.stdout;
+    if (!installed) {
+      return;
+    }
+    if (inbox) {
+      return '1.0.0';
+    }
+
+    return `${ version.major }.${ version.minor }.${ version.revision }.${ version.build }`;
   } catch (ex) {
-    console.warn(`wsl.exe ${ args.join(' ') }: ${ ex }`);
-
-    return undefined;
+    console.error('Failed to get WSL version:', ex);
   }
-
-  const matches = stdout.match(/^WSL[ -].*? ([0-9.]+)$/m);
-
-  if (!matches || matches.length !== 2) {
-    throw new Error(`failed to find WSL version from stdout "${ stdout }"`);
-  }
-
-  return matches[1];
 }
 
 /**
@@ -301,13 +279,10 @@ export async function queryUpgradeResponder(url: string, currentVersion: semver.
   };
 
   if (process.platform === 'win32') {
-    try {
-      requestPayload.extraInfo.wslVersion = await getWslVersion();
-    } catch (ex) {
-      // If we fail to get the version, still send the update ping but mark it
-      // as invalid.
-      console.error('Failed to get WSL version:', ex);
-      requestPayload.extraInfo.wslVersion = '<error>';
+    const wslVersion = await getWslVersionString();
+
+    if (wslVersion) {
+      requestPayload.extraInfo.wslVersion = wslVersion;
     }
   }
 
