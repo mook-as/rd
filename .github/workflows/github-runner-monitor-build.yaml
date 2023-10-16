@@ -3,9 +3,11 @@ name: 'GitHub Runner: Build Monitor'
 
 on:
   push:
-    paths: [ src/go/github-runner-monitor/** ]
+    paths:
+    - 'src/go/github-runner-monitor/**'
   pull_request:
-    paths: [ src/go/github-runner-monitor/** ]
+    paths:
+    - 'src/go/github-runner-monitor/**'
   workflow_dispatch:
 
 permissions:
