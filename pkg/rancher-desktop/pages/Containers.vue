@@ -52,7 +52,7 @@
         <td>
           <badge-state
             :color="isRunning(row) ? 'bg-success' : 'bg-darker'"
-            :label="row.State"
+            :label="row.State || 'unknown'"
           />
         </td>
       </template>
