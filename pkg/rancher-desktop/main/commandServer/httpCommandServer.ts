@@ -670,7 +670,7 @@ export class HttpCommandServer {
     const state = JSON.parse(data);
 
     try {
-      this.commandWorker.setBackendState(state);
+      await this.commandWorker.setBackendState(state);
     } catch (ex) {
       console.error(`error in setBackendState:`, ex);
       statusCode = 500;
@@ -787,7 +787,7 @@ export interface CommandWorkerInterface {
   /** Get the state of the backend */
   getBackendState: () => BackendState;
   /** Set the desired state of the backend */
-  setBackendState: (state: BackendState) => void;
+  setBackendState: (state: BackendState) => Promise<void>;
 
   // #region extensions
   /** List the installed extensions with their versions */

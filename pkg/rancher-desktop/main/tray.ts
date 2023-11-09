@@ -11,7 +11,7 @@ import Electron from 'electron';
 import { VMBackend } from '@pkg/backend/backend';
 import { State } from '@pkg/backend/k8s';
 import * as kubeconfig from '@pkg/backend/kubeconfig';
-import { Settings } from '@pkg/config/settings';
+import { SettingsManager } from '@pkg/config/settings/index';
 import { getIpcMainProxy } from '@pkg/main/ipcMain';
 import mainEvents from '@pkg/main/mainEvents';
 import { checkConnectivity } from '@pkg/main/networking';
@@ -32,7 +32,7 @@ export class Tray {
   protected trayMenu: Electron.Tray;
   protected backendIsLocked = '';
   protected kubernetesState = State.STOPPED;
-  private settings: Settings;
+  private settings: SettingsManager;
   private currentNetworkStatus: networkStatus = networkStatus.CHECKING;
   private static instance: Tray;
   private abortController: AbortController | undefined;
@@ -155,14 +155,14 @@ export class Tray {
     }));
   }
 
-  private constructor(settings: Settings) {
+  private constructor(settings: SettingsManager) {
     this.settings = settings;
     this.trayMenu = new Electron.Tray(this.trayIconSet.starting);
     this.trayMenu.setToolTip('Rancher Desktop');
     const menuItem = this.contextMenuItems.find(item => item.id === 'container-engine');
 
     if (menuItem) {
-      menuItem.label = `Container engine: ${ this.settings.containerEngine.name }`;
+      menuItem.label = `Container engine: ${ this.settings.get('containerEngine.name') }`;
     }
 
     // Discover k8s contexts
@@ -212,7 +212,7 @@ export class Tray {
     this.k8sStateChanged(mgr.state);
   };
 
-  private settingsUpdateEvent = (cfg: Settings) => {
+  private settingsUpdateEvent = (cfg: SettingsManager) => {
     this.settings = cfg;
     this.settingsChanged();
   };
@@ -227,7 +227,7 @@ export class Tray {
    * Checks for an existing instance of Tray. If one does not
    * exist, instantiate a new one.
    */
-  public static getInstance(settings: Settings): Tray {
+  public static getInstance(settings: SettingsManager): Tray {
     Tray.instance ??= new Tray(settings);
 
     return Tray.instance;
@@ -320,7 +320,7 @@ export class Tray {
       this.updateContexts();
       this.contextMenuItems = this.updateDashboardState(
         this.kubernetesState === State.STARTED &&
-        this.settings.kubernetes.enabled,
+        this.settings.get('kubernetes.enabled'),
       );
     } else if (this.kubernetesState === State.ERROR) {
       // For licensing reasons, we cannot just tint the Kubernetes logo.
@@ -339,7 +339,7 @@ export class Tray {
     const containerEngineMenu = this.contextMenuItems.find(item => item.id === 'container-engine');
 
     if (containerEngineMenu) {
-      const containerEngine = this.settings.containerEngine.name;
+      const containerEngine = this.settings.get('containerEngine.name');
 
       containerEngineMenu.label = containerEngine === 'containerd' ? containerEngine : `dockerd (${ containerEngine })`;
       containerEngineMenu.icon = containerEngine === 'containerd' ? path.join(paths.resources, 'icons', 'containerd-icon-color.png') : '';

@@ -18,6 +18,8 @@ export type RecursiveReadonly<T> = {
   T[P];
 };
 
+export type RecursivePartialReadonly<T> = RecursivePartial<RecursiveReadonly<T>>;
+
 /** UpperAlpha is the set of upper-case alphabets. */
 type UpperAlpha =
   'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M' |

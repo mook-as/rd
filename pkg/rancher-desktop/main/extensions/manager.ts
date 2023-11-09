@@ -12,7 +12,7 @@ import {
 } from './types';
 
 import type { ContainerEngineClient } from '@pkg/backend/containerClient';
-import { ContainerEngine, Settings } from '@pkg/config/settings';
+import { ContainerEngine, SettingsManager, Settings } from '@pkg/config/settings/index';
 import { getIpcMainProxy } from '@pkg/main/ipcMain';
 import mainEvents from '@pkg/main/mainEvents';
 import type { IpcMainEvents, IpcMainInvokeEvents, IpcRendererEvents } from '@pkg/typings/electron-ipc';
@@ -117,7 +117,7 @@ export class ExtensionManagerImpl implements ExtensionManager {
    */
   protected processes: Record<string, WeakRef<ReadableChildProcess>> = {};
 
-  async init(config: RecursiveReadonly<Settings>) {
+  async init(config: SettingsManager) {
     // Handle events from the renderer process.
     this.setMainListener('extensions/open-external', (...[, url]) => {
       Electron.shell.openExternal(url);
@@ -237,10 +237,10 @@ export class ExtensionManagerImpl implements ExtensionManager {
 
     // Install / uninstall extensions as needed.
     const tasks: Promise<any>[] = [];
-    const { enabled: allowEnabled, list: allowListRaw } = config.application.extensions.allowed;
+    const { enabled: allowEnabled, list: allowListRaw } = config.get('application.extensions.allowed');
     const allowList = allowEnabled ? allowListRaw : undefined;
 
-    for (const [repo, tag] of Object.entries(config.application.extensions.installed)) {
+    for (const [repo, tag] of Object.entries(config.get('application.extensions.installed'))) {
       if (!tag) {
         // If the tag is unset / falsy, we wanted to uninstall the extension.
         // There is no need to re-initialize it.
@@ -577,8 +577,8 @@ export class ExtensionManagerImpl implements ExtensionManager {
 }
 
 async function getExtensionManager(): Promise<ExtensionManager | undefined>;
-async function getExtensionManager(client: ContainerEngineClient, cfg: RecursiveReadonly<Settings>): Promise<ExtensionManager>;
-async function getExtensionManager(client?: ContainerEngineClient, cfg?: RecursiveReadonly<Settings>): Promise<ExtensionManager | undefined> {
+async function getExtensionManager(client: ContainerEngineClient, cfg: SettingsManager): Promise<ExtensionManager>;
+async function getExtensionManager(client?: ContainerEngineClient, cfg?: SettingsManager): Promise<ExtensionManager | undefined> {
   if (!client || manager?.client === client) {
     if (!client && !manager) {
       console.debug(`Warning: cached client missing, returning nothing`);
@@ -594,7 +594,7 @@ async function getExtensionManager(client?: ContainerEngineClient, cfg?: Recursi
   await manager?.shutdown();
 
   console.debug(`Creating new extension manager...`);
-  manager = new ExtensionManagerImpl(client, cfg.containerEngine.name === ContainerEngine.CONTAINERD);
+  manager = new ExtensionManagerImpl(client, cfg.get('containerEngine.name') === ContainerEngine.CONTAINERD);
 
   await manager.init(cfg);
 

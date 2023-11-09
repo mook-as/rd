@@ -3,8 +3,7 @@
  * @see @pkg/extensions for the renderer process code.
  */
 import type { ContainerEngineClient } from '@pkg/backend/containerClient';
-import type { Settings } from '@pkg/config/settings';
-import type { RecursiveReadonly } from '@pkg/utils/typeUtils';
+import type { SettingsManager } from '@pkg/config/settings/index';
 
 export type ExtensionMetadata = {
   /** Icon for the extension, as a path in the image. */
@@ -104,7 +103,7 @@ export interface Extension {
 export interface ExtensionManager {
   readonly client: ContainerEngineClient;
 
-  init(config: RecursiveReadonly<Settings>): Promise<void>;
+  init(config: SettingsManager): Promise<void>;
 
   /**
    * Get the given extension.

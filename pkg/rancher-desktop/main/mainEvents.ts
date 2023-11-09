@@ -6,10 +6,10 @@
 import { EventEmitter } from 'events';
 
 import type { VMBackend } from '@pkg/backend/backend';
-import type { Settings } from '@pkg/config/settings';
+import * as settings from '@pkg/config/settings/index';
 import type { TransientSettings } from '@pkg/config/transientSettings';
 import { DiagnosticsCheckerResult } from '@pkg/main/diagnostics/types';
-import { RecursivePartial, RecursiveReadonly } from '@pkg/utils/typeUtils';
+import { RecursivePartial, RecursivePartialReadonly } from '@pkg/utils/typeUtils';
 
 /**
  * MainEventNames describes the events available over the MainEvents event
@@ -29,21 +29,21 @@ interface MainEventNames {
    * Fetch the currently stored settings.
    * @note This may not match the currently active settings.
    */
-  'settings-fetch'(): Settings;
+  'settings-fetch'(): settings.SettingsManager;
 
   /**
    * Emitted when the settings have been changed.
    *
    * @param settings The new settings.
    */
-  'settings-update'(settings: Settings): void;
+  'settings-update'(settings: settings.SettingsManager): void;
 
   /**
    * Emitted to request that the settings be changed.
    *
    * @param settings The settings to change.
    */
-  'settings-write'(settings: RecursivePartial<RecursiveReadonly<Settings>>): void;
+  'settings-write'(settings: RecursivePartialReadonly<settings.Settings>): void;
 
   /**
    * Read the current transient settings.

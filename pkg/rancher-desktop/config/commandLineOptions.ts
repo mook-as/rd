@@ -2,10 +2,9 @@ import { join } from 'path';
 
 import _ from 'lodash';
 
-import { LockedSettingsType, Settings } from '@pkg/config/settings';
-import { save, turnFirstRunOff } from '@pkg/config/settingsImpl';
-import { TransientSettings } from '@pkg/config/transientSettings';
-import SettingsValidator from '@pkg/main/commandServer/settingsValidator';
+import { UserSettings } from './settings/defaults';
+import { SettingsManager } from './settings/manager';
+
 import Logging from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
 import { RecursiveKeys, RecursivePartial } from '@pkg/utils/typeUtils';
@@ -19,26 +18,21 @@ export class FatalCommandLineOptionError extends Error {}
 /**
  * Takes an array of strings, presumably from a command-line used to launch the app.
  * Key operations:
- * * All options start with '--'.
- * * Ignore leading unrecognized options.
- * * Complain about any unrecognized options after a recognized option has been processed.
- * * This calls the same settings-validator as used by `rdctl set` and the API to catch
- *   any attempts to update a locked field.
- *
- *  * All errors are fatal as this function is like an API for launching the application.
- * @param cfg - current loaded settings - this is updated and also returned
- * @param lockedFields - current locked fields
- * @param commandLineArgs - new command-line args to be merged into `cfg` (error if the field is locked)
- * @return updated cfg
+ * - All options start with '--'.
+ * - Ignore leading unrecognized options.
+ * - Complain about any unrecognized options after a recognized option has been processed.
+ * - All errors are fatal as this function is like an API for launching the application.
+ * @param settings The settings to modify.
+ * @param commandLineArgs New command-line args to be merged.
  */
-export function updateFromCommandLine(cfg: Settings, lockedFields: LockedSettingsType, commandLineArgs: string[]): Settings {
+export async function updateFromCommandLine(settings: SettingsManager, commandLineArgs: string[]) {
   const lim = commandLineArgs.length;
 
   if (lim === 0) {
-    return cfg;
+    return;
   }
   let processingExternalArguments = true;
-  let newSettings: RecursivePartial<Settings> = {};
+  let newSettings: RecursivePartial<UserSettings> = {};
 
   // As long as processingExternalArguments is true, ignore anything we don't recognize.
   // Once we see something that's "ours", set processingExternalArguments to false.
@@ -59,10 +53,10 @@ export function updateFromCommandLine(cfg: Settings, lockedFields: LockedSetting
       switch (value) {
       case '':
       case 'true':
-        TransientSettings.update({ noModalDialogs: true });
+        settings.loadTransient({ noModalDialogs: true });
         break;
       case 'false':
-        TransientSettings.update({ noModalDialogs: false });
+        settings.loadTransient({ noModalDialogs: false });
         break;
       default:
         throw new Error(`Invalid associated value for ${ arg }: must be unspecified (set to true), true or false`);
@@ -70,7 +64,7 @@ export function updateFromCommandLine(cfg: Settings, lockedFields: LockedSetting
       processingExternalArguments = false;
       continue;
     }
-    const currentValue: boolean|string|number|Record<string, undefined>|undefined = _.get(cfg, fqFieldName);
+    const currentValue = settings.get(fqFieldName as RecursiveKeys<UserSettings>);
 
     if (currentValue === undefined) {
       // Ignore unrecognized command-line options until we get to one we recognize
@@ -117,52 +111,35 @@ export function updateFromCommandLine(cfg: Settings, lockedFields: LockedSetting
         throw new TypeError(`Type of '${ finalValue }' is ${ typeof finalValue }, but current type of ${ fqFieldName } is ${ currentValueType } `);
       }
     }
-    newSettings = _.merge(newSettings, getObjectRepresentation(fqFieldName as RecursiveKeys<Settings>, finalValue));
+    newSettings = _.merge(newSettings, getObjectRepresentation(fqFieldName as RecursiveKeys<UserSettings>, finalValue));
   }
-  const settingsValidator = new SettingsValidator();
-  const newKubernetesVersion = newSettings.kubernetes?.version;
 
-  if (newKubernetesVersion) {
-    // RD hasn't loaded the supported k8s versions yet, so fake the list.
-    // If the field is locked, we don't need to know what it's locked to,
-    // just that the proposed version is different from the current version.
-    // The current version doesn't have to be the locked version, but will be after processing ends.
-    const limitedK8sVersionList: Array<string> = [newKubernetesVersion];
+  const result = await settings.set(newSettings);
 
-    if (cfg.kubernetes.version) {
-      limitedK8sVersionList.push(cfg.kubernetes.version);
-    }
-    settingsValidator.k8sVersions = limitedK8sVersionList;
-  }
-  const [needToUpdate, errors, isFatal] = settingsValidator.validateSettings(cfg, newSettings, lockedFields);
+  if (result.errors.length > 0) {
+    const errorString = `Error in command-line options:\n${ result.errors.join('\n') }`;
 
-  if (errors.length > 0) {
-    const errorString = `Error in command-line options:\n${ errors.join('\n') }`;
-
-    if (errors.some(error => /field ".+?" is locked/.test(error))) {
+    if (result.errors.some(error => /field ".+?" is locked/.test(error))) {
       throw new LockedFieldError(errorString);
     }
-    if (isFatal) {
+    if (result.fatal) {
       throw new FatalCommandLineOptionError(errorString);
     }
     throw new Error(errorString);
   }
-  if (needToUpdate) {
-    cfg = _.merge(cfg, newSettings);
-    save(cfg);
-  } else {
-    console.debug(`No need to update preferences based on command-line options ${ commandLineArgs.join(', ') }`);
-  }
-  turnFirstRunOff();
 
-  return cfg;
+  if (Object.keys(newSettings).length > 0) {
+    // If the user has set any settings via the command line, assume they know
+    // what they are doing and turn off first-run.
+    settings.setTransient({ application: { isFirstRun: false } });
+  }
 }
 
 // This is similar to `lodash.set({}, fqFieldAccessor, finalValue)
 // but it also does some error checking.
 // On the happy path, it's exactly like `lodash.set`
 // exported for unit tests only
-export function getObjectRepresentation(fqFieldAccessor: RecursiveKeys<Settings>, finalValue: boolean|number|string): RecursivePartial<Settings> {
+export function getObjectRepresentation(fqFieldAccessor: RecursiveKeys<UserSettings>, finalValue: boolean|number|string): RecursivePartial<UserSettings> {
   if (!fqFieldAccessor) {
     throw new Error("Invalid command-line option: can't be the empty string.");
   }
@@ -177,5 +154,5 @@ export function getObjectRepresentation(fqFieldAccessor: RecursiveKeys<Settings>
     throw new Error("Unrecognized command-line option ends with a dot ('.')");
   }
 
-  return _.set({}, fqFieldAccessor, finalValue) as RecursivePartial<Settings>;
+  return _.set({}, fqFieldAccessor, finalValue) as RecursivePartial<UserSettings>;
 }

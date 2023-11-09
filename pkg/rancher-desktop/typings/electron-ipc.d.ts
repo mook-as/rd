@@ -7,7 +7,7 @@ import semver from 'semver';
 
 import type { ServiceEntry } from '@pkg/backend/k8s';
 import { SnapshotDialog, SnapshotEvent } from '@pkg/main/snapshots/types';
-import type { RecursivePartial, Direction } from '@pkg/utils/typeUtils';
+import type { RecursivePartial, Direction, RecursiveReadonly } from '@pkg/utils/typeUtils';
 /**
  * IpcMainEvents describes events the renderer can send to the main process,
  * i.e. ipcRenderer.send() -> ipcMain.on().
@@ -103,10 +103,10 @@ export interface IpcMainEvents {
  * invoke on the main process, i.e. ipcRenderer.invoke() -> ipcMain.handle()
  */
 export interface IpcMainInvokeEvents {
-  'get-locked-fields': () => import('@pkg/config/settings').LockedSettingsType;
+  'get-locked-fields': () => import('@pkg/config/settings/index').PartialUserSettings;
   'settings-write': (arg: RecursivePartial<import('@pkg/config/settings').Settings>) => void;
-  'transient-settings-fetch': () => import('@pkg/config/transientSettings').TransientSettings;
-  'transient-settings-update': (arg: RecursivePartial<import('@pkg/config/transientSettings').TransientSettings>) => void;
+  'transient-settings-fetch': () => import('@pkg/config/settings/transient').TransientSettings;
+  'transient-settings-update': (arg: RecursivePartial<import('@pkg/config/settings/transient').TransientSettings>) => void;
   'service-fetch': (namespace?: string) => import('@pkg/backend/k8s').ServiceEntry[];
   'service-forward': (service: ServiceEntry, state: boolean) => void;
   'get-app-version': () => string;
@@ -149,7 +149,7 @@ export interface IpcMainInvokeEvents {
 export interface IpcRendererEvents {
   'backend-locked': () => void;
   'backend-unlocked': () => void;
-  'settings-update': (settings: import('@pkg/config/settings').Settings) => void;
+  'settings-update': (settings: RecursiveReadonly<import('@pkg/config/settings/index').Settings>) => void;
   'settings-read': (settings: import('@pkg/config/settings').Settings) => void;
   'get-app-version': (version: string) => void;
   'update-state': (state: import('@pkg/main/update').UpdateState) => void;

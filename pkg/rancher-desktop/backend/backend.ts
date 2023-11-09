@@ -1,10 +1,10 @@
 import fs from 'fs';
 import stream from 'stream';
 
-import { Settings } from '@pkg/config/settings';
+import { Settings } from '@pkg/config/settings/index';
 import * as childProcess from '@pkg/utils/childProcess';
 import EventEmitter from '@pkg/utils/eventEmitter';
-import { RecursiveKeys, RecursivePartial, RecursiveReadonly } from '@pkg/utils/typeUtils';
+import { RecursiveKeys, RecursivePartial, RecursivePartialReadonly, RecursiveReadonly } from '@pkg/utils/typeUtils';
 
 import type { ContainerEngineClient } from './containerClient';
 import type { KubernetesBackend } from './k8s';
@@ -155,7 +155,7 @@ export interface VMBackend extends EventEmitter<BackendEvents> {
   /**
    * Check if applying the given settings would require the backend to restart.
    */
-  requiresRestartReasons(config: RecursivePartial<BackendSettings>): Promise<RestartReasons>;
+  requiresRestartReasons(config: RecursivePartialReadonly<BackendSettings>): Promise<RestartReasons>;
 
   /**
    * Get the external IP address where the services would be listening on, if

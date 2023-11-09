@@ -17,14 +17,13 @@ import * as K8s from '@pkg/backend/k8s';
 import { Steve } from '@pkg/backend/steve';
 import { FatalCommandLineOptionError, LockedFieldError, updateFromCommandLine } from '@pkg/config/commandLineOptions';
 import { Help } from '@pkg/config/help';
-import * as settings from '@pkg/config/settings';
-import * as settingsImpl from '@pkg/config/settingsImpl';
-import { TransientSettings } from '@pkg/config/transientSettings';
+import * as settings from '@pkg/config/settings/index';
+import settingsLayerTransient, { TransientSettings } from '@pkg/config/settings/transient';
+import userSettingsValidator from '@pkg/config/settings/userValidator';
 import { IntegrationManager, getIntegrationManager } from '@pkg/integrations/integrationManager';
 import { PathManager } from '@pkg/integrations/pathManager';
 import { getPathManagerFor } from '@pkg/integrations/pathManagerImpl';
 import { CommandWorkerInterface, HttpCommandServer, BackendState } from '@pkg/main/commandServer/httpCommandServer';
-import SettingsValidator from '@pkg/main/commandServer/settingsValidator';
 import { HttpCredentialHelperServer } from '@pkg/main/credentialServer/httpCredentialHelperServer';
 import { DashboardServer } from '@pkg/main/dashboardServer';
 import { DeploymentProfileError, readDeploymentProfiles } from '@pkg/main/deploymentProfiles';
@@ -49,7 +48,7 @@ import paths from '@pkg/utils/paths';
 import { setupProtocolHandlers, protocolsRegistered } from '@pkg/utils/protocols';
 import { executable } from '@pkg/utils/resources';
 import { jsonStringifyWithWhiteSpace } from '@pkg/utils/stringify';
-import { RecursivePartial, RecursiveReadonly } from '@pkg/utils/typeUtils';
+import { RecursivePartial, RecursivePartialReadonly, RecursiveReadonly } from '@pkg/utils/typeUtils';
 import { getVersion } from '@pkg/utils/version';
 import * as window from '@pkg/window';
 import { closeDashboard, openDashboard } from '@pkg/window/dashboard';
@@ -73,7 +72,7 @@ const dockerDirManager = new DockerDirManager(path.join(os.homedir(), '.docker')
 const k8smanager = newK8sManager();
 const diagnostics: DiagnosticsManager = new DiagnosticsManager();
 
-let cfg: settings.Settings;
+let cfg = settings.manager;
 let firstRunDialogComplete = false;
 let gone = false; // when true indicates app is shutting down
 let imageEventHandler: ImageEventHandler|null = null;
@@ -87,7 +86,7 @@ let noModalDialogs = false;
 // and possibly other things should be disallowed. As of the time of writing,
 // set to true when a snapshot is being created or restored.
 let backendIsLocked = '';
-let deploymentProfiles: settings.DeploymentProfileType = { defaults: {}, locked: {} };
+const deploymentProfiles: settings.DeploymentProfileType = { defaults: {}, locked: {} };
 
 /**
  * pendingRestartContext is needed because with the CLI it's possible to change
@@ -109,7 +108,7 @@ Electron.protocol.registerSchemesAsPrivileged([
 ]);
 
 process.on('unhandledRejection', (reason: any, promise: any) => {
-  if (reason.code === 'ECONNREFUSED' && reason.port === cfg.kubernetes.port) {
+  if (reason.code === 'ECONNREFUSED' && reason.port === cfg.get('kubernetes.port')) {
     // Do nothing: a connection to the kubernetes server was broken
   } else {
     console.error('UnhandledRejectionWarning:', reason);
@@ -124,11 +123,11 @@ Electron.app.on('second-instance', async() => {
   }
 });
 
-// takes care of any propagation of settings we want to do
-// when settings change
-mainEvents.on('settings-update', async(newSettings) => {
-  console.log(`mainEvents settings-update: ${ JSON.stringify(newSettings) }`);
-  const runInDebugMode = settingsImpl.runInDebugMode(newSettings.application.debug);
+// Takes care of any propagation of settings we want to do
+// when settings change.  This is called after the setting gets written.
+mainEvents.on('settings-update', async(cfg) => {
+  console.log(`mainEvents settings-update: ${ JSON.stringify(cfg.getAll()) }`);
+  const runInDebugMode = cfg.get('application.debug');
 
   if (runInDebugMode) {
     setLogLevel('debug');
@@ -137,13 +136,13 @@ mainEvents.on('settings-update', async(newSettings) => {
   }
   k8smanager.debug = runInDebugMode;
 
-  if (pathManager.strategy !== newSettings.application.pathManagementStrategy) {
+  if (pathManager.strategy !== cfg.get('application.pathManagementStrategy')) {
     await pathManager.remove();
-    pathManager = getPathManagerFor(newSettings.application.pathManagementStrategy);
+    pathManager = getPathManagerFor(cfg.get('application.pathManagementStrategy'));
   }
   await pathManager.enforce();
 
-  if (newSettings.application.hideNotificationIcon) {
+  if (cfg.get('application.hideNotificationIcon')) {
     Tray.getInstance(cfg).hide();
   } else {
     if (firstRunDialogComplete) {
@@ -152,7 +151,7 @@ mainEvents.on('settings-update', async(newSettings) => {
     mainEvents.emit('k8s-check-state', k8smanager);
   }
 
-  await runRdctlSetup(newSettings);
+  await runRdctlSetup(cfg);
 });
 
 mainEvents.handle('settings-fetch', () => {
@@ -170,16 +169,27 @@ Electron.protocol.registerSchemesAsPrivileged([{ scheme: 'app' }, {
 Electron.app.whenReady().then(async() => {
   try {
     const commandLineArgs = getCommandLineArgs();
+    let commandLineError: any;
 
-    // Normally `noModalDialogs` is set when we call `updateFromCommandLine(.., commandLineArgs)`
-    // But if there's an error either in that function, or before, we'll need to know if we should
-    // display the error in a modal-dialog or not. So check the current command-line arguments for that.
-    //
-    // It's very unlikely that a string option is set to this exact string though.
-    // `rdctl start --images.namespace --no-modal-dialogs`
-    // is syntactically correct, but unlikely (because why would someone create a
-    // containerd namespace called "--no-modal-dialogs"?
-    noModalDialogs = commandLineArgs.includes('--no-modal-dialogs');
+    try {
+      // Load the command line arguments early so we can tell if the user has
+      // selected --no-modal-dialogs.  However, this may throw if the user has
+      // other issues with the command line, so we catch it and defer processing
+      // the error until later.  That way we can tell if we need to throw up
+      // error dialogs in early init.
+      if (commandLineArgs.length) {
+        await updateFromCommandLine(cfg, commandLineArgs);
+      }
+    } catch (err: any) {
+      commandLineError = err;
+      // It's very unlikely that a string option is set to this exact string.
+      // `rdctl start --images.namespace --no-modal-dialogs`
+      // is syntactically correct, but unlikely (because why would someone create a
+      // containerd namespace called "--no-modal-dialogs"?
+      // Note that we fail to parse "--no-modal-dialogs=true".
+      noModalDialogs = commandLineArgs.includes('--no-modal-dialogs');
+    }
+
     setupProtocolHandlers();
 
     // make sure we have the macOS version cached before calling getMacOsVersion()
@@ -200,7 +210,7 @@ Electron.app.whenReady().then(async() => {
     await setupNetworking();
 
     try {
-      deploymentProfiles = await readDeploymentProfiles();
+      await cfg.loadDeploymentProfiles();
     } catch (ex: any) {
       if (ex instanceof DeploymentProfileError) {
         await handleFailure(ex);
@@ -211,47 +221,35 @@ Electron.app.whenReady().then(async() => {
       throw ex;
     }
     try {
-      cfg = settingsImpl.load(deploymentProfiles);
-      settingsImpl.updateLockedFields(deploymentProfiles.locked);
+      await cfg.loadUser();
     } catch (err: any) {
       const titlePart = err.name || 'Failed to load settings';
       const message = err.message || err.toString();
 
       showErrorDialog(titlePart, message, true);
     }
-    try {
-      // The profile loader did rudimentary type-validation on profiles, but the validator checks for things
-      // like invalid strings for application.pathManagementStrategy.
-      validateEarlySettings(settings.defaultSettings, deploymentProfiles.defaults, {});
-      validateEarlySettings(settings.defaultSettings, deploymentProfiles.locked, {});
-
-      if (commandLineArgs.length) {
-        cfg = updateFromCommandLine(cfg, settingsImpl.getLockedSettings(), commandLineArgs);
-        k8smanager.noModalDialogs = noModalDialogs = TransientSettings.value.noModalDialogs;
-      }
-    } catch (err: any) {
-      noModalDialogs = TransientSettings.value.noModalDialogs;
-      if (err instanceof LockedFieldError || err instanceof DeploymentProfileError || err instanceof FatalCommandLineOptionError) {
+    if (commandLineError) {
+      if (commandLineError instanceof LockedFieldError || commandLineError instanceof DeploymentProfileError || commandLineError instanceof FatalCommandLineOptionError) {
         // This will end up calling `showErrorDialog(<title>, <message>, fatal=true)`
         // and the `fatal` part means we're expecting the app to shutdown.
         // Errors related to either deployment profiles or
         // attempts to change locked fields on the command-line are both fatal,
         // and should appear in a dialog box (or be written to console if
         // --no-modal-dialogs was specified on the command-line).
-        handleFailure(err).catch((err2: any) => {
+        handleFailure(commandLineError).catch((err2: any) => {
           console.log('Internal error trying to show a failure dialog: ', err2);
           process.exit(2);
         });
       } else if (!noModalDialogs) {
-        showErrorDialog('Invalid command-line arguments', err.message, false);
+        showErrorDialog('Invalid command-line arguments', commandLineError.message, false);
       }
-      console.log(`Failed to update command from argument ${ commandLineArgs.join(', ') }`, err);
+      console.log(`Failed to update command from argument ${ commandLineArgs.join(', ') }`, commandLineError);
     }
     httpCommandServer = new HttpCommandServer(new BackgroundCommandWorker());
     await httpCommandServer.init();
     await httpCredentialHelperServer.init();
 
-    pathManager = getPathManagerFor(cfg.application.pathManagementStrategy);
+    pathManager = getPathManagerFor(cfg.get('application.pathManagementStrategy'));
     await integrationManager.enforce();
 
     if (fs.existsSync(path.join(paths.appHome, 'backend.lock'))) {
@@ -263,7 +261,7 @@ Electron.app.whenReady().then(async() => {
 
     // Set up the updater; we may need to quit the app if an update is already
     // queued.
-    if (await setupUpdate(cfg.application.updater.enabled, true)) {
+    if (await setupUpdate(cfg.get('application.updater.enabled'), true)) {
       gone = true;
       // The update code will trigger a restart; don't do it here, as it may not
       // be ready yet.
@@ -291,11 +289,11 @@ Electron.app.whenReady().then(async() => {
       iconPath:           path.join(paths.resources, 'icons', 'logo-square-512.png'),
     });
 
-    if (!cfg.application.hideNotificationIcon) {
+    if (!cfg.get('application.hideNotificationIcon')) {
       Tray.getInstance(cfg).show();
     }
 
-    if (!cfg.application.startInBackground) {
+    if (!cfg.get('application.startInBackground')) {
       window.openMain();
     } else if (Electron.app.dock) {
       Electron.app.dock.hide();
@@ -325,7 +323,7 @@ Electron.app.whenReady().then(async() => {
 });
 
 async function doFirstRunDialog() {
-  if (!noModalDialogs && settingsImpl.firstRunDialogNeeded()) {
+  if (!noModalDialogs && cfg.get('application.isFirstRun')) {
     await window.openFirstRunDialog();
   }
   firstRunDialogComplete = true;
@@ -424,15 +422,15 @@ async function startBackend() {
  * @note Callers are responsible for handling errors thrown from here.
  */
 async function startK8sManager() {
-  const changedContainerEngine = currentContainerEngine !== cfg.containerEngine.name;
+  const changedContainerEngine = currentContainerEngine !== cfg.get('containerEngine.name');
 
-  currentContainerEngine = cfg.containerEngine.name;
-  enabledK8s = cfg.kubernetes.enabled;
+  currentContainerEngine = cfg.get('containerEngine.name');
+  enabledK8s = cfg.get('kubernetes.enabled');
 
   if (changedContainerEngine) {
     setupImageProcessor();
   }
-  await k8smanager.start(cfg);
+  await k8smanager.start(cfg.getAll());
 
   const getEM = (await import('@pkg/main/extensions/manager')).default;
 
@@ -451,7 +449,7 @@ async function startK8sManager() {
  */
 
 function setupImageProcessor() {
-  const imageProcessor = getImageProcessor(cfg.containerEngine.name, k8smanager.executor);
+  const imageProcessor = getImageProcessor(cfg.get('containerEngine.name'), k8smanager.executor);
 
   currentImageProcessor?.deactivate();
   if (!imageEventHandler) {
@@ -460,8 +458,8 @@ function setupImageProcessor() {
   imageEventHandler.imageProcessor = imageProcessor;
   currentImageProcessor = imageProcessor;
   currentImageProcessor.activate();
-  currentImageProcessor.namespace = cfg.images.namespace;
-  window.send('k8s-current-engine', cfg.containerEngine.name);
+  currentImageProcessor.namespace = cfg.get('images.namespace');
+  window.send('k8s-current-engine', cfg.get('containerEngine.name'));
 }
 
 interface K8sError {
@@ -561,11 +559,11 @@ ipcMainProxy.on('preferences-set-dirty', (_event, dirtyFlag) => {
 });
 
 ipcMainProxy.on('get-debugging-statuses', () => {
-  window.send('is-debugging', settingsImpl.runInDebugMode(cfg.application.debug));
-  window.send('always-debugging', settingsImpl.runInDebugMode(false));
+  window.send('is-debugging', cfg.get('application.debug'));
+  window.send('always-debugging', settingsLayerTransient.get('application.debug') ?? false);
 });
-function writeSettings(arg: RecursivePartial<RecursiveReadonly<settings.Settings>>) {
-  settingsImpl.save(settingsImpl.merge(cfg, arg));
+function writeSettings(arg: RecursivePartialReadonly<settings.UserSettings>) {
+  cfg.set(arg);
   mainEvents.emit('settings-update', cfg);
 }
 
@@ -595,11 +593,11 @@ ipcMainProxy.on('extensions/close', () => {
 });
 
 ipcMainProxy.handle('transient-settings-fetch', () => {
-  return Promise.resolve(TransientSettings.value);
+  return Promise.resolve(settingsLayerTransient.getAll());
 });
 
 ipcMainProxy.handle('transient-settings-update', (event, arg) => {
-  TransientSettings.update(arg);
+  settingsLayerTransient.merge(arg);
 });
 
 ipcMainProxy.on('k8s-state', (event) => {
@@ -620,7 +618,7 @@ ipcMainProxy.on('k8s-reset', async(_, arg) => {
 
 ipcMainProxy.handle('api-get-credentials', () => mainEvents.invoke('api-get-credentials'));
 
-ipcMainProxy.handle('get-locked-fields', () => settingsImpl.getLockedSettings());
+ipcMainProxy.handle('get-locked-fields', () => cfg.getLocked());
 
 function backendIsBusy() {
   return [K8s.State.STARTING, K8s.State.STOPPING].includes(k8smanager.state);
@@ -637,7 +635,7 @@ async function doK8sReset(arg: 'fast' | 'wipe' | 'fullRestart', context: Command
   try {
     switch (arg) {
     case 'fast':
-      await k8smanager.reset(cfg);
+      await k8smanager.reset(cfg.getAll());
       break;
     case 'fullRestart':
       await k8smanager.stop();
@@ -661,10 +659,10 @@ async function doK8sReset(arg: 'fast' | 'wipe' | 'fullRestart', context: Command
 }
 
 ipcMainProxy.on('k8s-restart', async() => {
-  if (cfg.kubernetes.port !== k8smanager.kubeBackend.desiredPort) {
+  if (cfg.get('kubernetes.port') !== k8smanager.kubeBackend.desiredPort) {
     // On port change, we need to wipe the VM.
     return doK8sReset('wipe', { interactive: true });
-  } else if (cfg.containerEngine.name !== currentContainerEngine || cfg.kubernetes.enabled !== enabledK8s) {
+  } else if (cfg.get('containerEngine.name') !== currentContainerEngine || cfg.get('kubernetes.enabled') !== enabledK8s) {
     return doK8sReset('fullRestart', { interactive: true });
   }
   try {
@@ -737,7 +735,7 @@ async function doFactoryReset(keepSystemImages: boolean) {
   const outfile = await fs.promises.open(path.join(tmpdir, 'rdctl-stdout.txt'), 'w');
   const args = ['factory-reset', `--remove-kubernetes-cache=${ (!keepSystemImages) ? 'true' : 'false' }`];
 
-  if (cfg.application.debug) {
+  if (cfg.get('application.debug')) {
     args.push('--verbose=true');
   }
   const rdctl = spawn(path.join(paths.resources, os.platform(), 'bin', 'rdctl'), args,
@@ -1061,7 +1059,7 @@ function newK8sManager() {
     mainEvents.emit('k8s-check-state', mgr);
     window.send('k8s-check-state', state);
     if ([K8s.State.STARTED, K8s.State.DISABLED].includes(state)) {
-      if (!cfg.kubernetes.version) {
+      if (!cfg.get('kubernetes.version')) {
         writeSettings({ kubernetes: { version: mgr.kubeBackend.version } });
       }
       currentImageProcessor?.relayNamespaces();
@@ -1110,19 +1108,6 @@ function newK8sManager() {
   return mgr;
 }
 
-function validateEarlySettings(cfg: settings.Settings, newSettings: RecursivePartial<settings.Settings>, lockedFields: settings.LockedSettingsType): void {
-  // RD hasn't loaded the supported k8s versions yet, so have it defer actually checking the specified version.
-  // If it can't find this version, it will silently move to the closest version.
-  // We'd have to add more code to report that.
-  // It isn't worth adding that code yet. It might never be needed.
-  const newSettingsForValidation = _.omit(newSettings, 'kubernetes.version');
-  const [, errors] = new SettingsValidator().validateSettings(cfg, newSettingsForValidation, lockedFields);
-
-  if (errors.length > 0) {
-    throw new LockedFieldError(`Error in deployment profiles:\n${ errors.join('\n') }`);
-  }
-}
-
 /**
  * Implement the methods the HttpCommandServer needs to service its requests.
  * These methods do two things:
@@ -1133,16 +1118,14 @@ function validateEarlySettings(cfg: settings.Settings, newSettings: RecursivePar
  * The `requestShutdown` method is a special case that never returns.
  */
 class BackgroundCommandWorker implements CommandWorkerInterface {
-  protected settingsValidator = new SettingsValidator();
-
   /**
    * Use the settings validator to validate settings after doing any
    * initialization.
    */
-  protected async validateSettings(existingSettings: settings.Settings, newSettings: RecursivePartial<settings.Settings>) {
+  protected async validateSettings(existingSettings: RecursiveReadonly<settings.Settings>, newSettings: RecursivePartial<settings.Settings>) {
     let clearVersionsAfterTesting = false;
 
-    if (newSettings.kubernetes?.version && this.settingsValidator.k8sVersions.length === 0) {
+    if (newSettings.kubernetes?.version && userSettingsValidator.k8sVersions.length === 0) {
       // If we're starting up (by running `rdctl start...`) we probably haven't loaded all the k8s versions yet.
       // We don't want to verify if the proposed version makes sense (if it doesn't, we'll assign the default version later).
       // Here we just want to make sure that if we're changing the version to a different value from the current one,
@@ -1156,13 +1139,13 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
           currentK8sVersions.push(existingSettings.kubernetes.version);
         }
       }
-      this.settingsValidator.k8sVersions = currentK8sVersions;
+      userSettingsValidator.k8sVersions = currentK8sVersions;
     }
 
-    const result = this.settingsValidator.validateSettings(existingSettings, newSettings, settingsImpl.getLockedSettings());
+    const result = userSettingsValidator.validateSettings(existingSettings, newSettings);
 
     if (clearVersionsAfterTesting) {
-      this.settingsValidator.k8sVersions = [];
+      userSettingsValidator.k8sVersions = [];
     }
 
     return result;
@@ -1173,7 +1156,7 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
   }
 
   getLockedSettings() {
-    return jsonStringifyWithWhiteSpace(settingsImpl.getLockedSettings());
+    return jsonStringifyWithWhiteSpace(cfg.getLocked());
   }
 
   getDiagnosticCategories(): string[]|undefined {
@@ -1209,14 +1192,14 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
   /**
    * Execute the preference update for services that don't require a backend restart.
    */
-  async handleSettingsUpdate(newConfig: settings.Settings): Promise<void> {
+  async handleSettingsUpdate(newConfig: RecursiveReadonly<settings.Settings>): Promise<void> {
     const allowedImagesConf = '/usr/local/openresty/nginx/conf/allowed-images.conf';
     const rcService = k8smanager.backend === 'wsl' ? 'wsl-service' : 'rc-service';
 
     // Update image allow list patterns, just in case the backend doesn't need restarting
     // TODO: review why this block is needed at all
-    if (cfg.containerEngine.allowedImages.enabled) {
-      const allowListConf = BackendHelper.createAllowedImageListConf(cfg.containerEngine.allowedImages);
+    if (cfg.get('containerEngine.allowedImages.enabled')) {
+      const allowListConf = BackendHelper.createAllowedImageListConf(cfg.get('containerEngine.allowedImages'));
 
       await k8smanager.executor.writeFile(allowedImagesConf, allowListConf, 0o644);
       await k8smanager.executor.execCommand({ root: true }, rcService, '--ifstarted', 'openresty', 'reload');
@@ -1238,7 +1221,7 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
    * @returns [{string} description of final state if no error, {string} error message]
    */
   async updateSettings(context: CommandWorkerInterface.CommandContext, newSettings: RecursivePartial<settings.Settings>): Promise<[string, string]> {
-    const [needToUpdate, errors] = await this.validateSettings(cfg, newSettings);
+    const { modified, errors } = await this.validateSettings(cfg.getAll(), newSettings);
 
     if (newSettings.version !== settings.CURRENT_SETTINGS_VERSION) {
       errors.unshift(this.buildSettingsVersionError(newSettings));
@@ -1246,10 +1229,10 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
     if (errors.length > 0) {
       return ['', `errors in attempt to update settings:\n${ errors.join('\n') }`];
     }
-    if (needToUpdate) {
+    if (modified) {
       writeSettings(newSettings);
       // cfg is a global, and at this point newConfig has been merged into it :(
-      window.send('settings-update', cfg);
+      window.send('settings-update', cfg.getAll());
       window.send('preferences/changed');
     } else {
       // Obviously if there are no settings to update, there's no need to restart.
@@ -1257,10 +1240,10 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
     }
 
     // Update the values that doesn't need a restart of the backend.
-    await this.handleSettingsUpdate(cfg);
+    await this.handleSettingsUpdate(cfg.getAll());
 
     // Check if the newly applied preferences demands a restart of the backend.
-    const restartReasons = await k8smanager.requiresRestartReasons(cfg);
+    const restartReasons = await k8smanager.requiresRestartReasons(cfg.getAll());
 
     if (Object.keys(restartReasons).length === 0) {
       return ['settings updated; no restart required', ''];
@@ -1281,7 +1264,7 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
   }
 
   async proposeSettings(context: CommandWorkerInterface.CommandContext, newSettings: RecursivePartial<settings.Settings>): Promise<[string, string]> {
-    const [, errors] = await this.validateSettings(cfg, newSettings);
+    const { errors } = await this.validateSettings(cfg.getAll(), newSettings);
 
     if (errors.length > 0) {
       return ['', `Errors in proposed settings:\n${ errors.join('\n') }`];
@@ -1299,27 +1282,24 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
   }
 
   getTransientSettings() {
-    return jsonStringifyWithWhiteSpace(TransientSettings.value);
+    return jsonStringifyWithWhiteSpace(settingsLayerTransient.getAll());
   }
 
-  updateTransientSettings(
+  async updateTransientSettings(
     context: CommandWorkerInterface.CommandContext,
     newTransientSettings: RecursivePartial<TransientSettings>,
   ): Promise<[string, string]> {
-    const [needToUpdate, errors] = this.settingsValidator.validateTransientSettings(TransientSettings.value, newTransientSettings);
+    const { modified, errors } = await cfg.setTransient(newTransientSettings);
 
-    return Promise.resolve(((): [string, string] => {
-      if (errors.length > 0) {
-        return ['', `errors in attempt to update Transient Settings:\n${ errors.join('\n') }`];
-      }
-      if (needToUpdate) {
-        TransientSettings.update(newTransientSettings);
+    if (errors.length > 0) {
+      return ['', `errors in attempt to update Transient Settings:\n${ errors.join('\n') }`];
+    }
 
-        return ['Updated Transient Settings', ''];
-      }
+    if (modified) {
+      return ['Updated Transient Settings', ''];
+    }
 
-      return ['No changes necessary', ''];
-    })());
+    return ['No changes necessary', ''];
   }
 
   async listExtensions() {
@@ -1346,7 +1326,7 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
     if (state === 'install') {
       console.debug(`Installing extension ${ image }...`);
       try {
-        const { enabled, list } = cfg.application.extensions.allowed;
+        const { enabled, list } = cfg.get('application.extensions.allowed');
 
         if (await extension.install(enabled ? list : undefined)) {
           return { status: 201 };
@@ -1399,12 +1379,12 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
     };
   }
 
-  setBackendState(state: BackendState): void {
+  async setBackendState(state: BackendState): Promise<void> {
     backendIsLocked = state.locked ? SNAPSHOT_OPERATION : '';
     mainEvents.emit('backend-locked-update', backendIsLocked);
     switch (state.vmState) {
     case State.STARTED:
-      cfg = settingsImpl.load(deploymentProfiles);
+      await cfg.loadDeploymentProfiles();
       mainEvents.emit('settings-update', cfg);
 
       setImmediate(() => {
@@ -1453,14 +1433,14 @@ function isRoot(): boolean {
   return os.userInfo().uid === 0;
 }
 
-async function runRdctlSetup(newSettings: settings.Settings): Promise<void> {
+async function runRdctlSetup(newSettings: settings.SettingsManager): Promise<void> {
   // don't do anything with auto-start configuration if running in development
   if (isDevEnv) {
     return;
   }
 
   const rdctlPath = executable('rdctl');
-  const args = ['setup', `--auto-start=${ newSettings.application.autoStart }`];
+  const args = ['setup', `--auto-start=${ newSettings.get('application.autoStart') }`];
 
   await spawnFile(rdctlPath, args);
 }
