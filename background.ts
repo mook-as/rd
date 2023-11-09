@@ -26,7 +26,7 @@ import { getPathManagerFor } from '@pkg/integrations/pathManagerImpl';
 import { CommandWorkerInterface, HttpCommandServer, BackendState } from '@pkg/main/commandServer/httpCommandServer';
 import { HttpCredentialHelperServer } from '@pkg/main/credentialServer/httpCredentialHelperServer';
 import { DashboardServer } from '@pkg/main/dashboardServer';
-import { DeploymentProfileError, readDeploymentProfiles } from '@pkg/main/deploymentProfiles';
+import { DeploymentProfileError } from '@pkg/main/deploymentProfiles';
 import { DiagnosticsManager, DiagnosticsResultCollection } from '@pkg/main/diagnostics/diagnostics';
 import { ExtensionErrorCode, isExtensionError } from '@pkg/main/extensions';
 import { ImageEventHandler } from '@pkg/main/imageEvents';
@@ -72,7 +72,7 @@ const dockerDirManager = new DockerDirManager(path.join(os.homedir(), '.docker')
 const k8smanager = newK8sManager();
 const diagnostics: DiagnosticsManager = new DiagnosticsManager();
 
-let cfg = settings.manager;
+const cfg = settings.manager;
 let firstRunDialogComplete = false;
 let gone = false; // when true indicates app is shutting down
 let imageEventHandler: ImageEventHandler|null = null;
@@ -86,7 +86,6 @@ let noModalDialogs = false;
 // and possibly other things should be disallowed. As of the time of writing,
 // set to true when a snapshot is being created or restored.
 let backendIsLocked = '';
-const deploymentProfiles: settings.DeploymentProfileType = { defaults: {}, locked: {} };
 
 /**
  * pendingRestartContext is needed because with the CLI it's possible to change
@@ -1119,36 +1118,18 @@ function newK8sManager() {
  */
 class BackgroundCommandWorker implements CommandWorkerInterface {
   /**
-   * Use the settings validator to validate settings after doing any
-   * initialization.
+   * Validate user-submitted proposed settings against the current settings.
    */
-  protected async validateSettings(existingSettings: RecursiveReadonly<settings.Settings>, newSettings: RecursivePartial<settings.Settings>) {
-    let clearVersionsAfterTesting = false;
+  protected validateSettings(newSettings: settings.SettingsLike) {
+    const versionedSettings = { version: settings.CURRENT_SETTINGS_VERSION, ...newSettings };
+    const migratedSettings = settings.migrateSettings(versionedSettings);
+    const result = userSettingsValidator.validateSettings(cfg.getAll(), migratedSettings);
 
-    if (newSettings.kubernetes?.version && userSettingsValidator.k8sVersions.length === 0) {
-      // If we're starting up (by running `rdctl start...`) we probably haven't loaded all the k8s versions yet.
-      // We don't want to verify if the proposed version makes sense (if it doesn't, we'll assign the default version later).
-      // Here we just want to make sure that if we're changing the version to a different value from the current one,
-      // the field isn't locked.
-      let currentK8sVersions = (await k8smanager.kubeBackend.availableVersions).map(entry => entry.version.version);
-
-      if (currentK8sVersions.length === 0) {
-        clearVersionsAfterTesting = true;
-        currentK8sVersions = [newSettings.kubernetes.version];
-        if (existingSettings.kubernetes.version) {
-          currentK8sVersions.push(existingSettings.kubernetes.version);
-        }
-      }
-      userSettingsValidator.k8sVersions = currentK8sVersions;
+    if (!settings.isVersionedSetting(newSettings) || newSettings.version !== settings.CURRENT_SETTINGS_VERSION) {
+      result.errors.unshift(this.buildSettingsVersionError(newSettings));
     }
 
-    const result = userSettingsValidator.validateSettings(existingSettings, newSettings);
-
-    if (clearVersionsAfterTesting) {
-      userSettingsValidator.k8sVersions = [];
-    }
-
-    return result;
+    return { result, migratedSettings };
   }
 
   getSettings() {
@@ -1179,10 +1160,10 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
     doFactoryReset(keepSystemImages);
   }
 
-  protected buildSettingsVersionError(newSettings: RecursivePartial<settings.Settings>): string {
+  protected buildSettingsVersionError(newSettings: settings.SettingsLike): string {
     const firstPart = `updating settings requires specifying version = ${ settings.CURRENT_SETTINGS_VERSION }`;
 
-    if (!('version' in newSettings)) {
+    if (!settings.isVersionedSetting(newSettings)) {
       return `${ firstPart }, but no version was specified`;
     } else {
       return `${ firstPart }, but received version ${ newSettings.version }`;
@@ -1220,30 +1201,28 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
    * @param newSettings: a subset of the Settings object, containing the desired values
    * @returns [{string} description of final state if no error, {string} error message]
    */
-  async updateSettings(context: CommandWorkerInterface.CommandContext, newSettings: RecursivePartial<settings.Settings>): Promise<[string, string]> {
-    const { modified, errors } = await this.validateSettings(cfg.getAll(), newSettings);
+  async updateSettings(context: CommandWorkerInterface.CommandContext, newSettings: settings.SettingsLike): Promise<[string, string]> {
+    const { result: { errors, modified }, migratedSettings } = this.validateSettings(newSettings);
 
-    if (newSettings.version !== settings.CURRENT_SETTINGS_VERSION) {
-      errors.unshift(this.buildSettingsVersionError(newSettings));
-    }
     if (errors.length > 0) {
-      return ['', `errors in attempt to update settings:\n${ errors.join('\n') }`];
+      return ['', `errors in attempt to update settings:\n${ errors.sort().join('\n') }`];
     }
-    if (modified) {
-      writeSettings(newSettings);
-      // cfg is a global, and at this point newConfig has been merged into it :(
-      window.send('settings-update', cfg.getAll());
-      window.send('preferences/changed');
-    } else {
+    if (!modified) {
       // Obviously if there are no settings to update, there's no need to restart.
       return ['no changes necessary', ''];
     }
 
+    writeSettings(migratedSettings);
+    const updatedSettings = cfg.getAll();
+
+    window.send('settings-update', updatedSettings);
+    window.send('preferences/changed');
+
     // Update the values that doesn't need a restart of the backend.
-    await this.handleSettingsUpdate(cfg.getAll());
+    await this.handleSettingsUpdate(updatedSettings);
 
     // Check if the newly applied preferences demands a restart of the backend.
-    const restartReasons = await k8smanager.requiresRestartReasons(cfg.getAll());
+    const restartReasons = await k8smanager.requiresRestartReasons(updatedSettings);
 
     if (Object.keys(restartReasons).length === 0) {
       return ['settings updated; no restart required', ''];
@@ -1264,14 +1243,14 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
   }
 
   async proposeSettings(context: CommandWorkerInterface.CommandContext, newSettings: RecursivePartial<settings.Settings>): Promise<[string, string]> {
-    const { errors } = await this.validateSettings(cfg.getAll(), newSettings);
+    const { result: { errors } } = this.validateSettings(newSettings);
 
     if (errors.length > 0) {
       return ['', `Errors in proposed settings:\n${ errors.join('\n') }`];
     }
-    const result = await k8smanager?.requiresRestartReasons(newSettings ?? {}) ?? {};
+    const restartReasons = await k8smanager?.requiresRestartReasons(newSettings ?? {}) ?? {};
 
-    return [JSON.stringify(result), ''];
+    return [JSON.stringify(restartReasons), ''];
   }
 
   async requestShutdown() {

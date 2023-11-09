@@ -3,17 +3,20 @@ import path from 'path';
 
 import _ from 'lodash';
 
-import { defaultSettings } from './defaults';
-import migrateSettings from './migrate';
+import { UserSettings, defaultSettings } from './defaults';
+import migrateSettings, { isVersionedSetting } from './migrate';
 import settingsLayerTransient from './transient';
-import { WritableSettingsLayer } from './types';
+import { SettingsLike, ValidatorReturn, VersionedSettingsLike, WritableSettingsLayer } from './types';
 import userSettingsValidator from './userValidator';
-import { SettingsLike, SettingsValidator, ValidatorReturn } from './validator';
+import { SettingsValidator } from './validator';
 
 import paths from '@pkg/utils/paths';
 import {
   RecursiveKeys, RecursivePartial, RecursivePartialReadonly, RecursiveReadonly, RecursiveTypes,
 } from '@pkg/utils/typeUtils';
+
+export type VersionedSettings = VersionedSettingsLike<UserSettings>;
+export type PartialVersionedSettings = VersionedSettingsLike<RecursivePartial<UserSettings>>;
 
 /**
  * SettingsLayerUser handles user settings (i.e. the ones that can be written).
@@ -35,8 +38,12 @@ export class SettingsLayerUser<T extends SettingsLike> implements WritableSettin
   async load() {
     try {
       const rawData = await fs.promises.readFile(this.settingsPath, 'utf-8');
+      const parsedData = JSON.parse(rawData);
 
-      this.settings = migrateSettings(JSON.parse(rawData)) as RecursivePartial<T>;
+      if (!isVersionedSetting(parsedData)) {
+        parsedData.version = 0;
+      }
+      this.settings = migrateSettings(parsedData) as RecursivePartial<T>;
     } catch (err: any) {
       if (err.code === 'ENOENT') {
         // The settings file doesn't exist -- assume this is first run.
@@ -76,7 +83,7 @@ export class SettingsLayerUser<T extends SettingsLike> implements WritableSettin
     return Promise.resolve(false);
   }
 
-  merge(changes: RecursivePartialReadonly<T>): Promise<ValidatorReturn> {
+  merge(changes: RecursivePartialReadonly<T>): void {
     /**
      * Customizer for use with _.mergeWith; the notable differences are:
      * - For arrays, we overwrite rather than append.
@@ -107,16 +114,9 @@ export class SettingsLayerUser<T extends SettingsLike> implements WritableSettin
     if (this.settings === undefined) {
       throw new Error('Cannot set user settings before loading');
     }
-    const validationResult = this.validator.validateSettings(_.merge({}, this.defaults, this.settings), changes);
-
-    if (validationResult.errors.length > 0) {
-      return Promise.resolve(validationResult);
-    }
     // Because this has passed validation already, it is safe to just merge the
     // changes in directly.
     _.mergeWith(this.settings, changes, customizer);
-
-    return Promise.resolve(validationResult);
   }
 }
 

@@ -1,26 +1,8 @@
 import _ from 'lodash';
 
+import { SettingsLike, ValidatorReturn } from './types';
+
 import { RecursivePartialReadonly } from '@pkg/utils/typeUtils';
-
-/**
- * ValidatorReturn describes the return value of a ValidatorFunc.
- */
-export class ValidatorReturn {
-  /** Whether the settings would be changed. */
-  modified = false;
-  /** Any errors that would result from the change. */
-  errors: string[] = [];
-  /** Whether any error is fatal. */
-  fatal = false;
-
-  merge(from: ValidatorReturn): ValidatorReturn {
-    this.modified ||= from.modified;
-    this.errors.push(...from.errors);
-    this.fatal ||= from.fatal;
-
-    return this;
-  }
-}
 
 /**
  * ValidatorFunc describes a validation function; it is used to check if a
@@ -59,8 +41,6 @@ export type SettingsValidationMap<T> = SettingsValidationMapEntry<T, T>;
 export interface SettingsValidator<T> {
   validateSettings(currentSettings: RecursivePartialReadonly<T>, newSettings: RecursivePartialReadonly<T>): ValidatorReturn;
 }
-
-export type SettingsLike = Record<string, any>;
 
 export abstract class BaseValidator<T> implements SettingsValidator<T> {
   abstract validateSettings(currentSettings: RecursivePartialReadonly<T>, newSettings: RecursivePartialReadonly<T>): ValidatorReturn;

@@ -7,7 +7,7 @@ import express from 'express';
 import _ from 'lodash';
 
 import { State } from '@pkg/backend/backend';
-import type { Settings } from '@pkg/config/settings';
+import type { PartialUserSettings, SettingsLike, UserSettings } from '@pkg/config/settings/index';
 import type { TransientSettings } from '@pkg/config/transientSettings';
 import type { DiagnosticsResultCollection } from '@pkg/main/diagnostics/diagnostics';
 import { ExtensionMetadata } from '@pkg/main/extensions/types';
@@ -490,7 +490,7 @@ export class HttpCommandServer {
     let error: string;
     let errorCode = 400;
     let result = '';
-    const body = await this.readRequestSettings<Settings>(request, 'updateSettings');
+    const body = await this.readRequestSettings<UserSettings>(request, 'updateSettings');
 
     try {
       if (Array.isArray(body)) {
@@ -775,8 +775,8 @@ export interface CommandWorkerInterface {
   factoryReset: (keepSystemImages: boolean) => void;
   getSettings: (context: commandContext) => string;
   getLockedSettings: (context: commandContext) => string;
-  updateSettings: (context: commandContext, newSettings: RecursivePartial<Settings>) => Promise<[string, string]>;
-  proposeSettings: (context: commandContext, newSettings: RecursivePartial<Settings>) => Promise<[string, string]>;
+  updateSettings: (context: commandContext, newSettings: SettingsLike) => Promise<[string, string]>;
+  proposeSettings: (context: commandContext, newSettings: SettingsLike) => Promise<[string, string]>;
   requestShutdown: (context: commandContext) => void;
   getDiagnosticCategories: (context: commandContext) => string[]|undefined;
   getDiagnosticIdsByCategory: (category: string, context: commandContext) => string[]|undefined;

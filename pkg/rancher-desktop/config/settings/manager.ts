@@ -2,11 +2,14 @@ import _ from 'lodash';
 
 import settingsLayerDefaults, { PartialUserSettings, UserSettings } from './defaults';
 import settingsLayerDeploymentProfile from './deploymentProfiles';
+import migrateSettings from './migrate';
 import settingsLayerTransient, { TransientSettings } from './transient';
-import { ValidatorReturn } from './types';
-import settingsLayerUser from './user';
+import { ValidatorReturn, VersionedSettingsLike } from './types';
+import settingsLayerUser, { PartialVersionedSettings } from './user';
 
-import { RecursiveKeys, RecursivePartial, RecursivePartialReadonly, RecursiveReadonly, RecursiveTypes } from '@pkg/utils/typeUtils';
+import {
+  RecursiveKeys, RecursivePartial, RecursivePartialReadonly, RecursiveReadonly, RecursiveTypes,
+} from '@pkg/utils/typeUtils';
 
 export type Settings = UserSettings & TransientSettings;
 
@@ -89,7 +92,7 @@ export class SettingsManager {
   }
 
   set<K extends RecursiveKeys<UserSettings>>(key: K, value: RecursiveTypes<UserSettings>[K]): Promise<boolean>;
-  set(changes: RecursivePartialReadonly<UserSettings>): Promise<ValidatorReturn>;
+  set(changes: RecursivePartialReadonly<UserSettings>): void;
   set<K extends RecursiveKeys<UserSettings>>(changes: K | RecursivePartialReadonly<UserSettings>, value?: RecursiveTypes<UserSettings>[K]) {
     if (value) {
       return this.userLayer.set(changes as K, value);

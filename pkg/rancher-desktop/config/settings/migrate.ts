@@ -1,9 +1,56 @@
-import { UserSettings } from './defaults';
+import _ from 'lodash';
+
+import { SettingsLike, VersionedSettingsLike } from './types';
+import { PartialVersionedSettings, VersionedSettings } from './user';
 
 import { PathManagementStrategy } from '@pkg/integrations/pathManager';
 import { RecursivePartial } from '@pkg/utils/typeUtils';
 
-const CURRENT_SETTINGS_VERSION = 10;
+export const CURRENT_SETTINGS_VERSION = 10;
+
+/**
+ * A migration function describes how to migration from one version to the next.
+ * @note The given settings may be partial.
+ */
+type MigrationFunction = (settings: SettingsLike) => void;
+
+/** Symbol for migrate() to indicate a setting should be deleted. */
+const DELETE = Symbol('delete');
+
+/**
+ * Migrate an individual setting.
+ * @param settings The settings object to mutate.
+ * @param oldKey The key to migrate from.
+ * @param newKey The key to migrate; or the constant DELETE to delete without migrating.
+ * @param convert Optional function to mutate the value during migration.
+ * @note If the old key is an empty object, it is deleted automatically.
+ */
+function migrate(settings: SettingsLike, oldKey: string, newKey: string | typeof DELETE, convert?: (input: any) => any) {
+  const parentPath = _.toPath(oldKey);
+  let leafPath = parentPath.pop() as string;
+  let parent = _.get(settings, parentPath);
+
+  if (typeof parent !== 'object' || !parent || !(leafPath in parent)) {
+    return;
+  }
+
+  const value = parent[leafPath];
+
+  if (newKey !== DELETE) {
+    _.set(settings, newKey, convert?.(value) ?? value);
+  }
+
+  if (oldKey === newKey) {
+    return; // In-place manipulation, don't delete it.
+  }
+  delete parent[leafPath];
+
+  while (parent !== settings && Object.keys(parent).length === 0) {
+    leafPath = parentPath.pop() as string;
+    parent = _.get(settings, parentPath);
+    delete parent[leafPath];
+  }
+}
 
 /**
  * Provide a mapping from settings version to a function used to update the
@@ -14,12 +61,9 @@ const CURRENT_SETTINGS_VERSION = 10;
  * current defaults, so we won't need an entry for every version change, as
  * most changes will get picked up from the defaults.
  */
-const updateTable: Record<number, (settings: any) => void> = {
+const updateTable: Record<number, MigrationFunction> = {
   1: (settings) => {
-    // Implement setting change from version 3 to 4
-    if ('rancherMode' in settings.kubernetes) {
-      delete settings.kubernetes.rancherMode;
-    }
+    migrate(settings, 'kubernetes.rancherMode', DELETE);
   },
   2: (_) => {
     // No need to still check for and delete archaic installations from version 0.3.0
@@ -30,54 +74,25 @@ const updateTable: Record<number, (settings: any) => void> = {
     // With settings v5, all traces of the kim builder are gone now, so no need to update it.
   },
   4: (settings) => {
-    settings.application = {
-      adminAccess:            !settings.kubernetes.suppressSudo,
-      debug:                  settings.debug,
-      pathManagementStrategy: settings.pathManagementStrategy,
-      telemetry:              { enabled: settings.telemetry },
-      updater:                { enabled: settings.updater },
-    };
-    settings.virtualMachine = {
-      hostResolver: settings.kubernetes.hostResolver,
-      memoryInGB:   settings.kubernetes.memoryInGB,
-      numberCPUs:   settings.kubernetes.numberCPUs,
-    };
-    settings.experimental = { virtualMachine: { socketVMNet: settings.kubernetes.experimental.socketVMNet } };
-    settings.WSL = { integrations: settings.kubernetes.WSLIntegrations };
-    settings.containerEngine.name = settings.kubernetes.containerEngine;
-
-    delete settings.kubernetes.containerEngine;
-    delete settings.kubernetes.experimental;
-    delete settings.kubernetes.hostResolver;
-    delete settings.kubernetes.checkForExistingKimBuilder;
-    delete settings.kubernetes.memoryInGB;
-    delete settings.kubernetes.numberCPUs;
-    delete settings.kubernetes.suppressSudo;
-    delete settings.kubernetes.WSLIntegrations;
-
-    delete settings.debug;
-    delete settings.pathManagementStrategy;
-    delete settings.telemetry;
-    delete settings.updater;
+    migrate(settings, 'kubernetes.suppressSudo', 'application.adminAccess', x => !x);
+    migrate(settings, 'debug', 'application.debug');
+    migrate(settings, 'pathManagementStrategy', 'application.pathManagementStrategy');
+    migrate(settings, 'telemetry', 'application.telemetry.enabled');
+    migrate(settings, 'updater', 'application.updater.enabled');
+    migrate(settings, 'kubernetes.hostResolver', 'virtualMachine.hostResolver');
+    migrate(settings, 'kubernetes.memoryInGB', 'virtualMachine.memoryInGB');
+    migrate(settings, 'kubernetes.numberCPUs', 'virtualMachine.numberCPUs');
+    migrate(settings, 'kubernetes.experimental.socketVMNet', 'experimental.virtualMachine.socketVMNet');
+    migrate(settings, 'kubernetes.WSLIntegrations', 'WSL.integrations');
+    migrate(settings, 'kubernetes.containerEngine', 'containerEngine.name');
   },
   5: (settings) => {
-    if (settings.containerEngine.imageAllowList) {
-      settings.containerEngine.allowedImages = settings.containerEngine.imageAllowList;
-      delete settings.containerEngine.imageAllowList;
-    }
-    if (settings.virtualMachine.experimental) {
-      if ('socketVMNet' in settings.virtualMachine.experimental) {
-        settings.experimental = { virtualMachine: { socketVMNet: settings.virtualMachine.experimental.socketVMNet } };
-        delete settings.virtualMachine.experimental.socketVMNet;
-      }
-      delete settings.virtualMachine.experimental;
-    }
-    for (const field of ['autoStart', 'hideNotificationIcon', 'startInBackground', 'window']) {
-      if (field in settings) {
-        settings.application[field] = settings[field];
-        delete settings[field];
-      }
-    }
+    migrate(settings, 'containerEngine.imageAllowList', 'containerEngine.allowedImages');
+    migrate(settings, 'virtualMachine.experimental.socketVMNet', 'experimental.virtualMachine.socketVMNet');
+    migrate(settings, 'autoStart', 'application.autoStart');
+    migrate(settings, 'hideNotificationIcon', 'application.hideNotificationIcon');
+    migrate(settings, 'startInBackground', 'application.startInBackground');
+    migrate(settings, 'window', 'application.window');
   },
   6: (settings) => {
     // Rancher Desktop 1.9+
@@ -92,47 +107,33 @@ const updateTable: Record<number, (settings: any) => void> = {
     settings.extensions = Object.fromEntries(extensions);
   },
   7: (settings) => {
-    if (settings.application.pathManagementStrategy === 'notset') {
-      if (process.platform === 'win32') {
-        settings.application.pathManagementStrategy = PathManagementStrategy.Manual;
-      } else {
-        settings.application.pathManagementStrategy = PathManagementStrategy.RcFiles;
+    migrate(settings, 'application.pathManagementStrategy', 'application.pathManagementStrategy', (oldValue) => {
+      if (oldValue !== 'notset') {
+        return oldValue;
       }
-    }
+
+      return process.platform === 'win32' ? PathManagementStrategy.Manual : PathManagementStrategy.RcFiles;
+    });
   },
   8: (settings) => {
     // Rancher Desktop 1.10: move .extensions to .application.extensions.installed
-    if (settings.extensions) {
-      settings.application ??= {};
-      settings.application.extensions ??= {};
-      settings.application.extensions.installed = settings.extensions;
-      delete settings.extensions;
-    }
+    migrate(settings, 'extensions', 'application.extensions.instaled');
   },
   9: (settings) => {
     // Rancher Desktop 1.11
     // Use string-list component instead of textarea for noproxy field. Blanks that
     // were accepted by the textarea need to be filtered out.
-    if (settings.experimental.virtualMachine.proxy.noproxy.length > 0) {
-      settings.experimental.virtualMachine.proxy.noproxy =
-        settings.experimental.virtualMachine.proxy.noproxy.map((entry: string) => {
-          return entry.trim();
-        }).filter((entry: string) => {
-          return entry.length > 0;
-        });
-    }
+    migrate(settings, 'experimental.virtualMachine.proxy.noproxy', 'experimental.virtualMachine.proxy.noproxy', (oldValue: string[]) => {
+      oldValue.map(entry => entry.trim()).filter(entry => entry.length > 0);
+    });
   },
 };
 
 /**
  * Migrate the stored settings.
  */
-export default function migrateSettings(settings: any): RecursivePartial<UserSettings> {
-  if (typeof settings !== 'object' || Object.keys(settings || {}).length === 0) {
-    return {};
-  }
-
-  let currentVersion = settings.version || 0;
+export default function migrateSettings(settings: VersionedSettingsLike): PartialVersionedSettings {
+  let currentVersion = settings.version;
 
   if (currentVersion > CURRENT_SETTINGS_VERSION) {
     // We've loaded a setting file from the future, so some settings will be ignored.
@@ -142,11 +143,24 @@ export default function migrateSettings(settings: any): RecursivePartial<UserSet
   }
 
   for (; currentVersion < CURRENT_SETTINGS_VERSION; currentVersion++) {
-    const migrator = updateTable[currentVersion] || (() => {});
+    const migrator = updateTable[currentVersion] || (() => undefined);
 
     migrator(settings);
   }
   settings.version = CURRENT_SETTINGS_VERSION;
 
-  return settings;
+  return settings as PartialVersionedSettings;
+}
+
+export function isVersionedSetting(settings: any): settings is VersionedSettingsLike {
+  switch (true) {
+  case typeof settings !== 'object':
+  case Object.keys(settings || {}).length === 0:
+  case !('version' in settings):
+  case typeof settings.version !== 'number':
+  case settings.version < 0:
+    return false;
+  }
+
+  return true;
 }

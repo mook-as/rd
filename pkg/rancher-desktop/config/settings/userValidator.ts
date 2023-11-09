@@ -7,9 +7,8 @@ import semver from 'semver';
 import settingsLayerDefaults, {
   CacheMode, MountType, ProtocolVersion, SecurityModel, UserSettings, VMType,
 } from './defaults';
-import {
-  BaseValidator, SettingsValidationMap, SettingsValidator, ValidatorFunc, ValidatorReturn,
-} from './validator';
+import { ValidatorReturn } from './types';
+import { BaseValidator, SettingsValidationMap, SettingsValidator, ValidatorFunc } from './validator';
 
 import { PathManagementStrategy } from '@pkg/integrations/pathManager';
 import { parseImageReference, validateImageName, validateImageTag } from '@pkg/utils/dockerUtils';

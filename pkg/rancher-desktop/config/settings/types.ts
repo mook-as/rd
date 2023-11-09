@@ -1,8 +1,27 @@
-import { ValidatorReturn } from './validator';
-
 import { RecursiveKeys, RecursivePartialReadonly, RecursiveTypes } from '@pkg/utils/typeUtils';
 
-export { ValidatorReturn } from './validator';
+export type SettingsLike = Record<string, any>;
+export type VersionedSettingsLike<T extends SettingsLike = SettingsLike> = T & { version: number };
+
+/**
+ * ValidatorReturn describes the return value of a ValidatorFunc.
+ */
+export class ValidatorReturn {
+  /** Whether the settings would be changed. */
+  modified = false;
+  /** Any errors that would result from the change. */
+  errors: string[] = [];
+  /** Whether any error is fatal. */
+  fatal = false;
+
+  merge(from: ValidatorReturn): ValidatorReturn {
+    this.modified ||= from.modified;
+    this.errors.push(...from.errors);
+    this.fatal ||= from.fatal;
+
+    return this;
+  }
+}
 
 /**
  * SettingsLayer describes an object that can be used to retrieve settings.
@@ -39,11 +58,11 @@ export interface WritableSettingsLayer<T extends Record<string, any>> extends Se
 
   /**
    * Merge the current layer with the given settings, after validating it.
-   * @note This is more expensive than set().
    * @param value The settings to update.
-   * @note If there are any validation errors, none of the settings are changed.
+   * @note This is more expensive than set().
+   * @note This assumes any migrations and validations have already taken place.
    */
-  merge(value: RecursivePartialReadonly<T>): Promise<ValidatorReturn>
+  merge(value: RecursivePartialReadonly<T>): void
 }
 
 /**

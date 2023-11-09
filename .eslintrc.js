@@ -174,11 +174,12 @@ module.exports.extends.push('plugin:import/typescript');
 
 Object.assign(module.exports.rules, {
   // Allow console.log &c.
-  'no-console':                   'off',
+  'no-console':                    'off',
   // Allow throw with non-error
-  'no-throw-literal':             'off',
+  'no-throw-literal':              'off',
   // Allow rejection with non-error
-  'prefer-promise-reject-errors': 'off',
+  'prefer-promise-reject-errors':  'off',
+  'no-constant-binary-expression': 'error',
 
   // These rules aren't enabled in dashboard (probably due to version differences
   // of the linter presets).
