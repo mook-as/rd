@@ -3,7 +3,7 @@ import migrateSettings from './migrate';
 
 export { SettingsManager, Settings } from './manager';
 export {
-  UserSettings, PartialUserSettings, ContainerEngine,
+  UserSettings, PartialUserSettings, ContainerEngine, VMType,MountType,
 } from './defaults';
 export { VersionedSettings, PartialVersionedSettings } from './user';
 export { CURRENT_SETTINGS_VERSION, isVersionedSetting } from './migrate';

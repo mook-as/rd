@@ -4,8 +4,9 @@ import path from 'path';
 
 import _ from 'lodash';
 
+import { ValidatorReturn } from '../types';
 import { SettingsLayerUser } from '../user';
-import { BaseValidator, SettingsValidationMap, SettingsValidator, ValidatorReturn } from '../validator';
+import { BaseValidator, SettingsValidationMap, SettingsValidator } from '../validator';
 
 import clone from '@pkg/utils/clone';
 import { RecursivePartialReadonly } from '@pkg/utils/typeUtils';
@@ -124,7 +125,7 @@ describe('SettingsLayerUser', () => {
   });
 
   describe('merge', () => {
-    it('should merge settings', async() => {
+    it('should merge settings', () => {
       const changes = {
         string: 'world',
         number: 99,
@@ -135,26 +136,21 @@ describe('SettingsLayerUser', () => {
       };
 
       subject['settings'] = clone(defaultSettings);
-      await expect(subject.merge(changes)).resolves.toBeInstanceOf(ValidatorReturn);
+      expect(subject.merge(changes)).toBeUndefined();
       expect(subject['settings']).toMatchObject(changes);
       expect(subject.get('extra')).toEqual('extra');
       expect(subject.get('child')).toHaveProperty('extra', 'extra');
     });
 
-    it('should not merge unknown settings', async() => {
+    it('should merge unknown settings', () => {
       const changes = {
         unknown: 'value',
         child:   { unknown: 'value' },
       } as any;
-      const expected = new ValidatorReturn();
 
-      expected.errors = expect.arrayContaining([
-        expect.stringContaining(`Changing field "unknown" via the API isn't supported`),
-        expect.stringContaining(`Changing field "child.unknown" via the API isn't supported`),
-      ]);
       subject['settings'] = clone(defaultSettings);
-      await expect(subject.merge(changes)).resolves.toEqual(expected);
-      expect(subject['settings']).toEqual(defaultSettings);
+      expect(subject.merge(changes)).toBeUndefined();
+      expect(subject['settings']).toMatchObject(changes);
     });
   });
 });

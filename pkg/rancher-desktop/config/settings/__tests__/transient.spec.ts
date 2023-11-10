@@ -1,10 +1,8 @@
 import _ from 'lodash';
 
-import { SettingsLayerTransient, defaultTransientSettings } from '../transient';
+import { SettingsLayerTransient, TransientSettings, defaultTransientSettings } from '../transient';
 import transientSettingsValidator from '../transientValidator';
 import { ValidatorReturn } from '../types';
-
-import { TransientSettings } from '@pkg/config/transientSettings';
 
 describe('SettingsLayerTransient', () => {
   let subject: SettingsLayerTransient<TransientSettings>;
@@ -24,7 +22,7 @@ describe('SettingsLayerTransient', () => {
       expect(subject.get('noModalDialogs')).toBeTruthy();
     });
     it('should reject unknown values', async() => {
-      await expect(subject.set('invalid' as any, '')).resolves.toBeFalsy();
+      await expect(subject.set('invalid' as any, '' as never)).resolves.toBeFalsy();
       expect(subject['settings']).toEqual(defaultTransientSettings);
     });
     it('should not reject invalid values', async() => {

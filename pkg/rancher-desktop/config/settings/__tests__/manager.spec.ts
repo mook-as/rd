@@ -36,12 +36,12 @@ describe('SettingsManager', () => {
   it('should fetch a default setting', () => {
     expect(subject.get('application.debug')).toBeFalsy();
   });
-  it('should fetch a user setting that had been changed', async() => {
-    await expect(subject.set({ application: { debug: true } })).resolves.toHaveProperty('errors', []);
+  it('should fetch a user setting that had been changed', () => {
+    expect(subject.set({ application: { debug: true } })).toBeUndefined();
     expect(subject.get('application.debug')).toBeTruthy();
   });
-  it('should fetch merged settings', async() => {
-    await expect(subject.set({ application: { debug: true } })).resolves.toHaveProperty('errors', []);
+  it('should fetch merged settings', () => {
+    expect(subject.set({ application: { debug: true } })).toBeUndefined();
     expect(subject.get('application')).toMatchObject({
       debug:       true,
       adminAccess: false,

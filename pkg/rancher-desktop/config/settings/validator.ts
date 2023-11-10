@@ -25,7 +25,7 @@ export type ValidatorFunc<S, C, D> =
  */
 type SettingsValidationMapEntry<S, T> = {
   [k in keyof T]:
-  T[k] extends string | Array<string> | number | boolean ?
+  T[k] extends string | Array<string> | number | boolean | undefined?
   ValidatorFunc<S, T[k], T[k]> :
   T[k] extends Record<string, infer V> ?
   SettingsValidationMapEntry<S, T[k]> | ValidatorFunc<S, T[k], Record<string, V>> :
@@ -101,6 +101,8 @@ export abstract class BaseValidator<T> implements SettingsValidator<T> {
         retval.errors.push(this.notSupported(fqname));
       }
     }
+
+    retval.modified &&= retval.errors.length === 0;
 
     return retval;
   }

@@ -1,6 +1,7 @@
 import _ from 'lodash';
 
-import { BaseValidator, SettingsValidationMap, ValidatorReturn } from '../validator';
+import { ValidatorReturn } from '../types';
+import { BaseValidator, SettingsValidationMap } from '../validator';
 
 import clone from '@pkg/utils/clone';
 import { RecursivePartialReadonly } from '@pkg/utils/typeUtils';

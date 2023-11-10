@@ -17,97 +17,96 @@ import { RecursivePartialReadonly } from '@pkg/utils/typeUtils';
 
 type settingsLike = Record<string, any>;
 
-class UserSettingsValidator extends BaseValidator<UserSettings> implements SettingsValidator<UserSettings> {
+export class UserSettingsValidator extends BaseValidator<UserSettings> implements SettingsValidator<UserSettings> {
   k8sVersions: Array<string> = [];
-  allowedSettings: SettingsValidationMap<UserSettings> | null = null;
   synonymsTable: settingsLike|null = null;
+  allowedSettings: SettingsValidationMap<UserSettings> = {
+    application: {
+      adminAccess: this.checkLima(this.checkBoolean),
+      debug:       this.checkBoolean,
+      extensions:  {
+        allowed: {
+          enabled: this.checkBoolean,
+          list:    this.checkExtensionAllowList,
+        },
+        installed: this.checkInstalledExtensions,
+      },
+      pathManagementStrategy: this.checkLima(this.checkEnum(...Object.values(PathManagementStrategy))),
+      telemetry:              { enabled: this.checkBoolean },
+      /** Whether we should check for updates and apply them. */
+      updater:                { enabled: this.checkBoolean },
+      autoStart:              this.checkBoolean,
+      startInBackground:      this.checkBoolean,
+      hideNotificationIcon:   this.checkBoolean,
+      window:                 { quitOnClose: this.checkBoolean },
+    },
+    containerEngine: {
+      allowedImages: {
+        enabled:  this.checkBoolean,
+        patterns: this.checkUniqueStringArray,
+      },
+      // 'docker' has been canonicalized to 'moby' already, but we want to include it as a valid value in the error message
+      name: this.checkEnum('containerd', 'moby', 'docker'),
+    },
+    virtualMachine: {
+      memoryInGB:   this.checkLima(this.checkNumber(1, Number.POSITIVE_INFINITY)),
+      numberCPUs:   this.checkLima(this.checkNumber(1, Number.POSITIVE_INFINITY)),
+      hostResolver: this.checkPlatform('win32', this.checkBoolean),
+    },
+    experimental: {
+      virtualMachine: {
+        mount: {
+          type: this.checkLima(this.checkMulti(
+            this.checkEnum(...Object.values(MountType)),
+            this.checkMountType),
+          ),
+          '9p': {
+            securityModel:   this.checkLima(this.check9P(this.checkEnum(...Object.values(SecurityModel)))),
+            protocolVersion: this.checkLima(this.check9P(this.checkEnum(...Object.values(ProtocolVersion)))),
+            msizeInKib:      this.checkLima(this.check9P(this.checkNumber(4, Number.POSITIVE_INFINITY))),
+            cacheMode:       this.checkLima(this.check9P(this.checkEnum(...Object.values(CacheMode)))),
+          },
+        },
+        socketVMNet:      this.checkPlatform('darwin', this.checkBoolean),
+        networkingTunnel: this.checkPlatform('win32', this.checkBoolean),
+        useRosetta:       this.checkPlatform('darwin', this.checkRosetta),
+        type:             this.checkPlatform('darwin', this.checkMulti(
+          this.checkEnum(...Object.values(VMType)),
+          this.checkVMType),
+        ),
+        proxy: {
+          enabled:  this.checkPlatform('win32', this.checkBoolean),
+          address:  this.checkPlatform('win32', this.checkString),
+          password: this.checkPlatform('win32', this.checkString),
+          port:     this.checkPlatform('win32', this.checkNumber(1, 65535)),
+          username: this.checkPlatform('win32', this.checkString),
+          noproxy:  this.checkPlatform('win32', this.checkUniqueStringArray),
+        },
+      },
+    },
+    WSL:        { integrations: this.checkPlatform('win32', this.checkBooleanMapping) },
+    kubernetes: {
+      version: this.checkKubernetesVersion,
+      port:    this.checkNumber(1, 65535),
+      enabled: this.checkBoolean,
+      options: { traefik: this.checkBoolean, flannel: this.checkBoolean },
+      ingress: { localhostOnly: this.checkPlatform('win32', this.checkBoolean) },
+    },
+    portForwarding: { includeKubernetesServices: this.checkBoolean },
+    images:         {
+      showAll:   this.checkBoolean,
+      namespace: this.checkString,
+    },
+    diagnostics: {
+      mutedChecks: this.checkBooleanMapping,
+      showMuted:   this.checkBoolean,
+    },
+  };
 
   validateSettings(
     currentSettings: RecursivePartialReadonly<UserSettings>,
     newSettings: RecursivePartialReadonly<UserSettings>,
   ): ValidatorReturn {
-    this.allowedSettings ||= {
-      application: {
-        adminAccess: this.checkLima(this.checkBoolean),
-        debug:       this.checkBoolean,
-        extensions:  {
-          allowed: {
-            enabled: this.checkBoolean,
-            list:    this.checkExtensionAllowList,
-          },
-          installed: this.checkInstalledExtensions,
-        },
-        pathManagementStrategy: this.checkLima(this.checkEnum(...Object.values(PathManagementStrategy))),
-        telemetry:              { enabled: this.checkBoolean },
-        /** Whether we should check for updates and apply them. */
-        updater:                { enabled: this.checkBoolean },
-        autoStart:              this.checkBoolean,
-        startInBackground:      this.checkBoolean,
-        hideNotificationIcon:   this.checkBoolean,
-        window:                 { quitOnClose: this.checkBoolean },
-      },
-      containerEngine: {
-        allowedImages: {
-          enabled:  this.checkBoolean,
-          patterns: this.checkUniqueStringArray,
-        },
-        // 'docker' has been canonicalized to 'moby' already, but we want to include it as a valid value in the error message
-        name: this.checkEnum('containerd', 'moby', 'docker'),
-      },
-      virtualMachine: {
-        memoryInGB:   this.checkLima(this.checkNumber(1, Number.POSITIVE_INFINITY)),
-        numberCPUs:   this.checkLima(this.checkNumber(1, Number.POSITIVE_INFINITY)),
-        hostResolver: this.checkPlatform('win32', this.checkBoolean),
-      },
-      experimental: {
-        virtualMachine: {
-          mount: {
-            type: this.checkLima(this.checkMulti(
-              this.checkEnum(...Object.values(MountType)),
-              this.checkMountType),
-            ),
-            '9p': {
-              securityModel:   this.checkLima(this.check9P(this.checkEnum(...Object.values(SecurityModel)))),
-              protocolVersion: this.checkLima(this.check9P(this.checkEnum(...Object.values(ProtocolVersion)))),
-              msizeInKib:      this.checkLima(this.check9P(this.checkNumber(4, Number.POSITIVE_INFINITY))),
-              cacheMode:       this.checkLima(this.check9P(this.checkEnum(...Object.values(CacheMode)))),
-            },
-          },
-          socketVMNet:      this.checkPlatform('darwin', this.checkBoolean),
-          networkingTunnel: this.checkPlatform('win32', this.checkBoolean),
-          useRosetta:       this.checkPlatform('darwin', this.checkRosetta),
-          type:             this.checkPlatform('darwin', this.checkMulti(
-            this.checkEnum(...Object.values(VMType)),
-            this.checkVMType),
-          ),
-          proxy: {
-            enabled:  this.checkPlatform('win32', this.checkBoolean),
-            address:  this.checkPlatform('win32', this.checkString),
-            password: this.checkPlatform('win32', this.checkString),
-            port:     this.checkPlatform('win32', this.checkNumber(1, 65535)),
-            username: this.checkPlatform('win32', this.checkString),
-            noproxy:  this.checkPlatform('win32', this.checkUniqueStringArray),
-          },
-        },
-      },
-      WSL:        { integrations: this.checkPlatform('win32', this.checkBooleanMapping) },
-      kubernetes: {
-        version: this.checkKubernetesVersion,
-        port:    this.checkNumber(1, 65535),
-        enabled: this.checkBoolean,
-        options: { traefik: this.checkBoolean, flannel: this.checkBoolean },
-        ingress: { localhostOnly: this.checkPlatform('win32', this.checkBoolean) },
-      },
-      portForwarding: { includeKubernetesServices: this.checkBoolean },
-      images:         {
-        showAll:   this.checkBoolean,
-        namespace: this.checkString,
-      },
-      diagnostics: {
-        mutedChecks: this.checkBooleanMapping,
-        showMuted:   this.checkBoolean,
-      },
-    };
     this.canonicalizeSynonyms(newSettings);
 
     return this.checkProposedSettings(

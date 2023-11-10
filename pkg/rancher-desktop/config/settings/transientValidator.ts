@@ -1,7 +1,8 @@
 import _ from 'lodash';
 
 import { NavItemName, TransientSettings, navItemNames } from './transient';
-import { BaseValidator, SettingsValidationMap, SettingsValidator, ValidatorReturn } from './validator';
+import { ValidatorReturn } from './types';
+import { BaseValidator, SettingsValidationMap, SettingsValidator } from './validator';
 
 import { RecursivePartialReadonly } from '@pkg/utils/typeUtils';
 import { preferencesNavItems } from '@pkg/window/preferenceConstants';
@@ -9,19 +10,21 @@ import { preferencesNavItems } from '@pkg/window/preferenceConstants';
 type TransientSettingsValidationMap = SettingsValidationMap<TransientSettings>;
 
 export class TransientSettingsValidator extends BaseValidator<TransientSettings> implements SettingsValidator<TransientSettings> {
-  protected allowedTransientSettings: TransientSettingsValidationMap | null = null;
+  protected allowedTransientSettings: TransientSettingsValidationMap = {
+    application: {
+      debug:      this.checkUnchanged,
+      isFirstRun: this.checkUnchanged,
+    },
+    noModalDialogs: this.checkBoolean,
+    preferences:    {
+      navItem: {
+        current:     this.checkPreferencesNavItemCurrent,
+        currentTabs: this.checkPreferencesNavItemCurrentTabs,
+      },
+    },
+  };
 
   validateSettings(currentSettings: RecursivePartialReadonly<TransientSettings>, newSettings: RecursivePartialReadonly<TransientSettings>): ValidatorReturn {
-    this.allowedTransientSettings ||= {
-      noModalDialogs: this.checkBoolean,
-      preferences:    {
-        navItem: {
-          current:     this.checkPreferencesNavItemCurrent,
-          currentTabs: this.checkPreferencesNavItemCurrentTabs,
-        },
-      },
-    };
-
     return this.checkProposedSettings(
       _.merge({}, currentSettings, newSettings),
       this.allowedTransientSettings,
@@ -50,7 +53,7 @@ export class TransientSettingsValidator extends BaseValidator<TransientSettings>
 
   protected checkPreferencesNavItemCurrentTabs(
     mergedSettings: TransientSettings,
-    currentValue: Record<NavItemName, string | undefined>,
+    currentValue: Partial<Record<NavItemName, string | undefined>>,
     desiredValue: any,
     fqname: string,
   ): ValidatorReturn {

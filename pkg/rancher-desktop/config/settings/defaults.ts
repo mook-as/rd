@@ -1,3 +1,5 @@
+import os from 'os';
+
 import _ from 'lodash';
 
 import { SettingsLayer } from './types';
@@ -76,7 +78,7 @@ export const defaultSettings = {
     name: ContainerEngine.MOBY,
   },
   virtualMachine: {
-    memoryInGB:   2,
+    memoryInGB:   getDefaultMemory(),
     numberCPUs:   2,
     /**
      * when set to true Dnsmasq is disabled and all DNS resolution
@@ -136,6 +138,17 @@ export const defaultSettings = {
     },
   },
 };
+
+function getDefaultMemory() {
+  if (os.platform() === 'darwin' || os.platform() === 'linux') {
+    const totalMemoryInGB = os.totalmem() / 2 ** 30;
+
+    // 25% of available ram up to a maximum of 6gb
+    return Math.min(6, Math.round(totalMemoryInGB / 4.0));
+  } else {
+    return 2;
+  }
+}
 
 export type UserSettings = typeof defaultSettings;
 

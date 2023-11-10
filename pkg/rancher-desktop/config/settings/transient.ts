@@ -1,8 +1,8 @@
 import _ from 'lodash';
 
 import transientSettingsValidator from './transientValidator';
-import { ValidatorReturn, WritableSettingsLayer } from './types';
-import { SettingsLike, SettingsValidator } from './validator';
+import { SettingsLike, ValidatorReturn, WritableSettingsLayer } from './types';
+import { SettingsValidator } from './validator';
 
 import clone from '@pkg/utils/clone';
 import { RecursiveKeys, RecursivePartialReadonly, RecursiveTypes } from '@pkg/utils/typeUtils';
