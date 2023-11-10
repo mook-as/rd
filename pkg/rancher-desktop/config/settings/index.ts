@@ -10,4 +10,5 @@ export { CURRENT_SETTINGS_VERSION, isVersionedSetting } from './migrate';
 export {
   SettingsLike, VersionedSettingsLike, ValidatorReturn,
 } from './types';
+export { LockedFieldError } from './deploymentProfiles';
 export { manager, migrateSettings };

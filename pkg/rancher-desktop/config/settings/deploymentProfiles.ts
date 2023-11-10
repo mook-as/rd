@@ -5,6 +5,8 @@ import { SettingsLayer } from './types';
 
 import { RecursiveKeys, RecursivePartial, RecursiveTypes } from '@pkg/utils/typeUtils';
 
+export class LockedFieldError extends Error {}
+
 class SettingsLayerDeploymentProfile implements SettingsLayer<UserSettings> {
   #settings?: RecursivePartial<UserSettings>;
 
@@ -12,7 +14,7 @@ class SettingsLayerDeploymentProfile implements SettingsLayer<UserSettings> {
     return _.get(this.#settings ?? {}, key, undefined) as RecursiveTypes<UserSettings>[K];
   }
 
-  getAll() {
+  getSnapshot() {
     return this.#settings ?? {};
   }
 }

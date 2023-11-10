@@ -70,7 +70,7 @@ export class SettingsLayerTransient<T extends SettingsLike> implements WritableS
     return _.get(this.settings, key, undefined) as RecursiveTypes<T>[K];
   }
 
-  getAll() {
+  getSnapshot() {
     return this.settings;
   }
 

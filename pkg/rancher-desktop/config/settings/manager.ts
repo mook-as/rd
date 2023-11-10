@@ -2,10 +2,9 @@ import _ from 'lodash';
 
 import settingsLayerDefaults, { PartialUserSettings, UserSettings } from './defaults';
 import settingsLayerDeploymentProfile from './deploymentProfiles';
-import migrateSettings from './migrate';
 import settingsLayerTransient, { TransientSettings } from './transient';
-import { ValidatorReturn, VersionedSettingsLike } from './types';
-import settingsLayerUser, { PartialVersionedSettings } from './user';
+import { SettingsLayer, ValidatorReturn } from './types';
+import settingsLayerUser from './user';
 
 import {
   RecursiveKeys, RecursivePartial, RecursivePartialReadonly, RecursiveReadonly, RecursiveTypes,
@@ -20,7 +19,7 @@ export type Settings = UserSettings & TransientSettings;
  * The various load* functions should be called in the order they are listed in
  * the class definition.
  */
-export class SettingsManager {
+export class SettingsManager implements SettingsLayer<Settings> {
   /**
    * Load transient values.  This is typically values that are set from the
    * command line.
@@ -42,6 +41,7 @@ export class SettingsManager {
     await this.userLayer.load();
   }
 
+  protected lockedLayer = settingsLayerDeploymentProfile.locked;
   protected transientLayer = settingsLayerTransient;
   protected userLayer = settingsLayerUser;
 
@@ -49,7 +49,7 @@ export class SettingsManager {
    * The settings layers, in descreasing order of preference.
    */
   protected *getLayers() {
-    yield settingsLayerDeploymentProfile.locked;
+    yield this.lockedLayer;
     yield this.transientLayer;
     yield this.userLayer;
     yield settingsLayerDeploymentProfile.defaults;
@@ -76,19 +76,19 @@ export class SettingsManager {
     return merged as RecursiveTypes<Settings>[K];
   }
 
-  getAll(): RecursiveReadonly<Settings> {
+  getSnapshot(): RecursiveReadonly<Settings> {
     const merged: RecursivePartial<Settings> = {};
 
     // If the key is undefined, return all settings.
     for (const layer of this.getLayers()) {
-      _.merge({}, layer.getAll(), merged);
+      _.merge({}, layer.getSnapshot(), merged);
     }
 
     return merged as RecursiveReadonly<Settings>;
   }
 
   getLocked(): PartialUserSettings {
-    return settingsLayerDeploymentProfile.locked.getAll();
+    return this.lockedLayer.getSnapshot();
   }
 
   set<K extends RecursiveKeys<UserSettings>>(key: K, value: RecursiveTypes<UserSettings>[K]): Promise<boolean>;

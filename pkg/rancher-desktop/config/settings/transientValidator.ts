@@ -1,7 +1,7 @@
 import _ from 'lodash';
 
 import { NavItemName, TransientSettings, navItemNames } from './transient';
-import { ValidatorReturn } from './types';
+import { SettingsLayer, ValidatorReturn } from './types';
 import { BaseValidator, SettingsValidationMap, SettingsValidator } from './validator';
 
 import { RecursivePartialReadonly } from '@pkg/utils/typeUtils';
@@ -24,7 +24,7 @@ export class TransientSettingsValidator extends BaseValidator<TransientSettings>
     },
   };
 
-  validateSettings(currentSettings: RecursivePartialReadonly<TransientSettings>, newSettings: RecursivePartialReadonly<TransientSettings>): ValidatorReturn {
+  validateSettings(currentSettings: SettingsLayer<TransientSettings>, newSettings: RecursivePartialReadonly<TransientSettings>): ValidatorReturn {
     return this.checkProposedSettings(
       _.merge({}, currentSettings, newSettings),
       this.allowedTransientSettings,

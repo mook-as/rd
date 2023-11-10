@@ -7,7 +7,7 @@ import semver from 'semver';
 import settingsLayerDefaults, {
   CacheMode, MountType, ProtocolVersion, SecurityModel, UserSettings, VMType,
 } from './defaults';
-import { ValidatorReturn } from './types';
+import { SettingsLayer, ValidatorReturn } from './types';
 import { BaseValidator, SettingsValidationMap, SettingsValidator, ValidatorFunc } from './validator';
 
 import { PathManagementStrategy } from '@pkg/integrations/pathManager';
@@ -104,7 +104,7 @@ export class UserSettingsValidator extends BaseValidator<UserSettings> implement
   };
 
   validateSettings(
-    currentSettings: RecursivePartialReadonly<UserSettings>,
+    currentSettings: SettingsLayer<UserSettings>,
     newSettings: RecursivePartialReadonly<UserSettings>,
   ): ValidatorReturn {
     this.canonicalizeSynonyms(newSettings);

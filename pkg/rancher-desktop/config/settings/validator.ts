@@ -1,8 +1,10 @@
 import _ from 'lodash';
 
-import { SettingsLike, ValidatorReturn } from './types';
+import { SettingsLayer, SettingsLike, ValidatorReturn } from './types';
 
-import { RecursivePartialReadonly } from '@pkg/utils/typeUtils';
+import {
+  RecursiveKeys, RecursivePartial, RecursivePartialReadonly, RecursiveReadonly, RecursiveTypes,
+} from '@pkg/utils/typeUtils';
 
 /**
  * ValidatorFunc describes a validation function; it is used to check if a
@@ -38,12 +40,44 @@ type SettingsValidationMapEntry<S, T> = {
  */
 export type SettingsValidationMap<T> = SettingsValidationMapEntry<T, T>;
 
-export interface SettingsValidator<T> {
-  validateSettings(currentSettings: RecursivePartialReadonly<T>, newSettings: RecursivePartialReadonly<T>): ValidatorReturn;
+export interface SettingsValidator<T extends SettingsLike> {
+  /**
+   * Validate active settings.
+   */
+  validateSettings(currentSettings: SettingsLayer<T>, newSettings: RecursivePartialReadonly<T>): ValidatorReturn;
+
+  /**
+   * Validate settings based on a snapshot.
+   */
+  validateSnapshot(currentSettings: RecursivePartialReadonly<T>, newSettings: RecursivePartialReadonly<T>, lockedSettings: SettingsLayer<T>): ValidatorReturn;
 }
 
-export abstract class BaseValidator<T> implements SettingsValidator<T> {
-  abstract validateSettings(currentSettings: RecursivePartialReadonly<T>, newSettings: RecursivePartialReadonly<T>): ValidatorReturn;
+/**
+ * SettingsFromSnapshot implemenets SettingsLayer<T> based on a snapshot of
+ * settings.
+ */
+class SettingsFromSnapshot<T extends SettingsLike> implements SettingsLayer<T> {
+  protected snapshot: T;
+  constructor(snapshot: T) {
+    this.snapshot = snapshot;
+  }
+
+  get<K extends RecursiveKeys<T>>(key: K): RecursiveTypes<T>[K] | undefined {
+    return _.get(this.snapshot, key);
+  }
+
+  getSnapshot(): RecursivePartialReadonly<T> {
+    return this.snapshot;
+  }
+}
+
+export abstract class BaseValidator<T extends SettingsLike> implements SettingsValidator<T> {
+  abstract validateSettings(currentSettings: SettingsLayer<T>, newSettings: RecursivePartialReadonly<T>): ValidatorReturn;
+  abstract validateSnapshot(currentSettings: RecursivePartialReadonly<T>, newSettings: RecursivePartialReadonly<T>, lockedSettings: SettingsLayer<T>): ValidatorReturn;
+
+  protected layerFromSnapshot(snapshot: T): SettingsLayer<T> {
+    return new SettingsFromSnapshot(snapshot);
+  }
 
   /**
    * The core function for checking proposed user settings.
@@ -60,13 +94,13 @@ export abstract class BaseValidator<T> implements SettingsValidator<T> {
   protected checkProposedSettings<S>(
     mergedSettings: S,
     allowedSettings: SettingsLike,
-    currentSettings: SettingsLike,
+    currentSettings: SettingsLayer<T>,
     newSettings: SettingsLike,
     prefix: string): ValidatorReturn {
     const retval = new ValidatorReturn();
 
     for (const k in newSettings) {
-      const fqname = prefix ? `${ prefix }.${ k }` : k;
+      const fqname = (prefix ? `${ prefix }.${ k }` : k) as RecursiveKeys<T>;
 
       if (!(k in allowedSettings)) {
         retval.errors.push(this.notSupported(fqname));
@@ -74,17 +108,19 @@ export abstract class BaseValidator<T> implements SettingsValidator<T> {
       }
       if (typeof (allowedSettings[k]) === 'object') {
         if (typeof (newSettings[k]) === 'object') {
-          retval.merge(this.checkProposedSettings(mergedSettings, allowedSettings[k], currentSettings[k], newSettings[k], fqname));
+          retval.merge(this.checkProposedSettings(mergedSettings, allowedSettings[k], currentSettings, newSettings[k], fqname));
         } else {
           retval.errors.push(`Setting "${ fqname }" should wrap an inner object, but got <${ newSettings[k] }>.`);
         }
       } else if (typeof (newSettings[k]) === 'object') {
+        const currentValue = currentSettings.get(fqname);
+
         if (typeof allowedSettings[k] === 'function') {
           // Special case for things like `.WSLIntegrations` which have unknown fields.
           const validator: ValidatorFunc<S, any, any> = allowedSettings[k];
 
-          if (!_.isEqual(currentSettings[k], newSettings[k])) {
-            retval.merge(validator.call(this, mergedSettings, currentSettings[k], newSettings[k], fqname));
+          if (!_.isEqual(currentValue, newSettings[k])) {
+            retval.merge(validator.call(this, mergedSettings, currentValue, newSettings[k], fqname));
           }
         } else {
           // newSettings[k] should be valid JSON because it came from `JSON.parse(incoming-payload)`.
@@ -92,10 +128,11 @@ export abstract class BaseValidator<T> implements SettingsValidator<T> {
           retval.errors.push(`Setting "${ fqname }" should be a simple value, but got <${ JSON.stringify(newSettings[k]) }>.`);
         }
       } else if (typeof allowedSettings[k] === 'function') {
+        const currentValue = currentSettings.get(fqname);
         const validator: ValidatorFunc<S, any, any> = allowedSettings[k];
 
-        if (!_.isEqual(currentSettings[k], newSettings[k])) {
-          retval.merge(validator.call(this, mergedSettings, currentSettings[k], newSettings[k], fqname));
+        if (!_.isEqual(currentValue, newSettings[k])) {
+          retval.merge(validator.call(this, mergedSettings, currentValue, newSettings[k], fqname));
         }
       } else {
         retval.errors.push(this.notSupported(fqname));

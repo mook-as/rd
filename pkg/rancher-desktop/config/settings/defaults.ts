@@ -161,7 +161,7 @@ class SettingsLayerDefaults implements SettingsLayer<UserSettings> {
     return _.get(defaultSettings, key, undefined);
   }
 
-  getAll() {
+  getSnapshot() {
     return defaultSettings;
   }
 }

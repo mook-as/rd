@@ -26,7 +26,7 @@ export class ValidatorReturn {
 /**
  * SettingsLayer describes an object that can be used to retrieve settings.
  */
-export interface SettingsLayer<T extends Record<string, any>> {
+export interface SettingsLayer<T extends SettingsLike> {
   /**
    * Get the current value with the given key.
    * @param key The key to get, as a dotted string: `a.b.c`
@@ -35,16 +35,16 @@ export interface SettingsLayer<T extends Record<string, any>> {
   get<K extends RecursiveKeys<T>>(key: K): RecursiveTypes<T>[K] | undefined;
 
   /**
-   * Get all values.
+   * Get a snapshot of all values.
    */
-  getAll(): RecursivePartialReadonly<T>;
+  getSnapshot(): RecursivePartialReadonly<T>;
 }
 
 /**
  * WritableSettingsLayer describes a SettingsLayer that can additionally be
  * used to write settings back to storage.
  */
-export interface WritableSettingsLayer<T extends Record<string, any>> extends SettingsLayer<T> {
+export interface WritableSettingsLayer<T extends SettingsLike> extends SettingsLayer<T> {
   /**
    * Set the value of the given key to the given value.
    * @param key The key to set, as a dotted string: `a.b.c`

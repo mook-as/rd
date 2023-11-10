@@ -4,10 +4,7 @@ import merge from 'lodash/merge';
 import semver from 'semver';
 
 import { BackendSettings } from '@pkg/backend/backend';
-import { LockedFieldError } from '@pkg/config/commandLineOptions';
-import { ContainerEngine, Settings } from '@pkg/config/settings';
-import * as settingsImpl from '@pkg/config/settingsImpl';
-import SettingsValidator from '@pkg/main/commandServer/settingsValidator';
+import { ContainerEngine, LockedFieldError, Settings } from '@pkg/config/settings/index';
 import Logging from '@pkg/utils/logging';
 import { showMessageBox } from '@pkg/window';
 
@@ -143,14 +140,11 @@ export default class BackendHelper {
    * If it's valid and available, use it.
    * Otherwise fall back to the first (recommended) available version.
    */
-  static async getDesiredVersion(cfg: BackendSettings, availableVersions: semver.SemVer[], noModalDialogs: boolean, settingsWriter: (_: any) => void): Promise<semver.SemVer> {
+  static async getDesiredVersion(cfg: BackendSettings, availableVersions: semver.SemVer[], settingsWriter: (_: any) => void): Promise<semver.SemVer> {
     const currentConfigVersionString = cfg?.kubernetes?.version;
     let storedVersion: semver.SemVer|null;
     let matchedVersion: semver.SemVer|undefined;
     const invalidK8sVersionMainMessage = `Requested kubernetes version '${ currentConfigVersionString }' is not a valid version.`;
-    const sv = new SettingsValidator();
-    const lockedSettings = settingsImpl.getLockedSettings();
-    const versionIsLocked = lockedSettings.kubernetes?.version ?? false;
 
     // If we're here either there's no existing cfg.k8s.version, or it isn't valid
     if (!availableVersions.length) {
@@ -197,7 +191,7 @@ export default class BackendHelper {
       const message = invalidK8sVersionMainMessage;
       const detail = `Falling back to the most recent stable version of ${ availableVersions[0] }`;
 
-      if (noModalDialogs) {
+      if (cfg.noModalDialogs) {
         console.log(`${ message } ${ detail }`);
       } else {
         const options: Electron.MessageBoxOptions = {

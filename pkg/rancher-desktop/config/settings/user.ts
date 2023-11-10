@@ -6,7 +6,7 @@ import _ from 'lodash';
 import { UserSettings, defaultSettings } from './defaults';
 import migrateSettings, { isVersionedSetting } from './migrate';
 import settingsLayerTransient from './transient';
-import { SettingsLike, ValidatorReturn, VersionedSettingsLike, WritableSettingsLayer } from './types';
+import { SettingsLayer, SettingsLike, ValidatorReturn, VersionedSettingsLike, WritableSettingsLayer } from './types';
 import userSettingsValidator from './userValidator';
 import { SettingsValidator } from './validator';
 
@@ -66,7 +66,7 @@ export class SettingsLayerUser<T extends SettingsLike> implements WritableSettin
     return _.get(this.settings ?? {}, key, undefined);
   }
 
-  getAll() {
+  getSnapshot() {
     return this.settings ?? {};
   }
 

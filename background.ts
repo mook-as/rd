@@ -1123,7 +1123,7 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
   protected validateSettings(newSettings: settings.SettingsLike) {
     const versionedSettings = { version: settings.CURRENT_SETTINGS_VERSION, ...newSettings };
     const migratedSettings = settings.migrateSettings(versionedSettings);
-    const result = userSettingsValidator.validateSettings(cfg.getAll(), migratedSettings);
+    const result = userSettingsValidator.validateSettings(cfg, migratedSettings);
 
     if (!settings.isVersionedSetting(newSettings) || newSettings.version !== settings.CURRENT_SETTINGS_VERSION) {
       result.errors.unshift(this.buildSettingsVersionError(newSettings));
