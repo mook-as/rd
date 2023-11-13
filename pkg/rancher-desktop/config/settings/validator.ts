@@ -44,12 +44,7 @@ export interface SettingsValidator<T extends SettingsLike> {
   /**
    * Validate active settings.
    */
-  validateSettings(currentSettings: SettingsLayer<T>, newSettings: RecursivePartialReadonly<T>): ValidatorReturn;
-
-  /**
-   * Validate settings based on a snapshot.
-   */
-  validateSnapshot(currentSettings: RecursivePartialReadonly<T>, newSettings: RecursivePartialReadonly<T>, lockedSettings: SettingsLayer<T>): ValidatorReturn;
+  validateSettings(currentSettings: RecursiveReadonly<T>, lockedSettings: RecursivePartialReadonly<T>, newSettings: RecursivePartialReadonly<T>): ValidatorReturn;
 }
 
 /**

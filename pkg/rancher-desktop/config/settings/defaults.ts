@@ -2,10 +2,10 @@ import os from 'os';
 
 import _ from 'lodash';
 
-import { SettingsLayer } from './types';
+import { IsSettingLeaf, SettingLeaf, SettingsLayer, SettingsLike } from './types';
 
 import { PathManagementStrategy } from '@pkg/integrations/pathManager';
-import { RecursiveKeys, RecursivePartialReadonly, RecursiveTypes } from '@pkg/utils/typeUtils';
+import { RecursiveKeys, RecursivePartialReadonly, RecursiveReadonly, RecursiveTypes } from '@pkg/utils/typeUtils';
 
 export enum VMType {
   QEMU = 'qemu',
@@ -154,18 +154,29 @@ export type UserSettings = typeof defaultSettings;
 
 export type PartialUserSettings = RecursivePartialReadonly<UserSettings>;
 
-class SettingsLayerDefaults implements SettingsLayer<UserSettings> {
-  get<K extends RecursiveKeys<UserSettings>>(key: K): RecursiveTypes<UserSettings>[K] | undefined;
-  get(key: string[]): any;
-  get(key: string | string[]): any {
-    return _.get(defaultSettings, key, undefined);
-  }
+function WrapSubtree<T extends SettingsLike>(input: T): RecursiveReadonly<T> {
+  const wrappers: Partial<Record<keyof T, RecursiveReadonly<SettingsLike>>> = {};
 
-  getSnapshot() {
-    return defaultSettings;
-  }
+  return new Proxy(input, {
+    get(target, p) {
+      if (typeof p !== 'string') {
+        throw new TypeError('Symbols are not allowed');
+      }
+      const value = target[p];
+
+      if (value === undefined || IsSettingLeaf(value)) {
+        return value;
+      }
+      wrappers[p as keyof T] ||= WrapSubtree(value);
+
+      return wrappers[p];
+    },
+    set() {
+      throw new TypeError('Setting default settings is invalid');
+    },
+  }) as RecursiveReadonly<T>;
 }
 
-const settingsLayerDefaults = new SettingsLayerDefaults();
+const settingsLayerDefaults = WrapSubtree(defaultSettings);
 
 export default settingsLayerDefaults;

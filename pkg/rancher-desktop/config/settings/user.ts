@@ -6,7 +6,9 @@ import _ from 'lodash';
 import { UserSettings, defaultSettings } from './defaults';
 import migrateSettings, { isVersionedSetting } from './migrate';
 import settingsLayerTransient from './transient';
-import { SettingsLayer, SettingsLike, ValidatorReturn, VersionedSettingsLike, WritableSettingsLayer } from './types';
+import {
+  IsSettingLeaf, SettingLeaf, SettingsLike, ValidatorReturn, VersionedSettingsLike,
+} from './types';
 import userSettingsValidator from './userValidator';
 import { SettingsValidator } from './validator';
 
@@ -18,10 +20,42 @@ import {
 export type VersionedSettings = VersionedSettingsLike<UserSettings>;
 export type PartialVersionedSettings = VersionedSettingsLike<RecursivePartial<UserSettings>>;
 
+function WrapSubtree<T extends SettingsLike>(input: T, validator: SettingsValidator<T>): T {
+  const wrappers: Partial<T> = {};
+
+  function get<K extends keyof T>(target: T, p: K): T[K] {
+    type SettingsLikeValue = Extract<T[K], SettingsLike>;
+    const value = target[p];
+
+    if (value === undefined || IsSettingLeaf(value)) {
+      return value;
+    }
+    const validationWrapper: SettingsValidator<SettingsLikeValue> = {
+      validateSettings(currentSettings, lockedSettings, newSettings) {
+        throw new Error('not implemented');
+      },
+    };
+
+    wrappers[p] ||= WrapSubtree<SettingsLikeValue>(value as SettingsLikeValue, validationWrapper);
+
+    return wrappers[p] as Exclude<T[K], undefined>;
+  }
+
+  return new Proxy(input, {
+    get(target, p) {
+      if (typeof p !== 'string') {
+        throw new TypeError('Symbols are not allowed');
+      }
+
+      return get(target, p);
+    },
+  });
+}
+
 /**
  * SettingsLayerUser handles user settings (i.e. the ones that can be written).
  */
-export class SettingsLayerUser<T extends SettingsLike> implements WritableSettingsLayer<T> {
+export class ZSettingsLayerUser<T extends SettingsLike> {
   protected readonly defaults: RecursiveReadonly<T>;
   protected readonly validator: SettingsValidator<T>;
   protected settings?: RecursivePartial<T>;
@@ -62,25 +96,8 @@ export class SettingsLayerUser<T extends SettingsLike> implements WritableSettin
     await fs.promises.writeFile(this.settingsPath, JSON.stringify(this.settings ?? {}), 'utf-8');
   }
 
-  get<K extends RecursiveKeys<T>>(key: K): RecursiveTypes<T>[K] | undefined {
-    return _.get(this.settings ?? {}, key, undefined);
-  }
-
-  getSnapshot() {
-    return this.settings ?? {};
-  }
-
-  set<K extends RecursiveKeys<T>>(key: K, value: RecursiveTypes<T>[K]): Promise<boolean> {
-    if (this.settings === undefined) {
-      throw new Error('Cannot set user settings before loading');
-    }
-    if (_.has(this.defaults, key)) {
-      _.set(this.settings, key, value);
-
-      return Promise.resolve(true);
-    }
-
-    return Promise.resolve(false);
+  get() {
+    return WrapSubtree(this.settings ?? {}, this.validator);
   }
 
   merge(changes: RecursivePartialReadonly<T>): void {
