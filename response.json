@@ -1,12 +1,1 @@
-{
-  "versions": [
-    {
-      "Name": "v99.0.0",
-      "ReleaseDate": "2024-01-29T21:24:43.883Z",
-      "Tags": [
-        "latest"
-      ]
-    }
-  ],
-  "requestIntervalInMinutes": 60
-}
+{"versions":[{"Name":"v99.0.0","ReleaseDate":"2024-01-30T20:30:52.661Z","Tags":["latest"]}],"requestIntervalInMinutes":1}
