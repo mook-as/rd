@@ -8,5 +8,5 @@
       ]
     }
   ],
-  "requestIntervalInMinutes": 1
+  "requestIntervalInMinutes": 60
 }
