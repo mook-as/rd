@@ -1,1 +1,12 @@
-{"versions":[{"Name":"v99.0.0-0-gabcdef","ReleaseDate":"2022-11-25T21:24:43.883Z","Tags":["latest"]}],"requestIntervalInMinutes":1}
+{
+  "versions": [
+    {
+      "Name": "v99.0.0",
+      "ReleaseDate": "2024-01-29T21:24:43.883Z",
+      "Tags": [
+        "latest"
+      ]
+    }
+  ],
+  "requestIntervalInMinutes": 1
+}
