@@ -1,0 +1,69 @@
+# This is a reusable workflow to determine if the current change requires an E2E
+# run.  This is required because using [paths-ignored] directly means the whole
+# workflow is skipped, but that means that it doesn't count as having run a
+# required workflow.
+
+# Usage:
+#   jobs:
+#     check_paths:
+#        uses: ./.github/workflows/actions/paths-ignore.yaml
+#     do_thing:
+#        if: jobs.check_paths.outputs.should_run
+
+name: Check for ignored paths
+
+on:
+  workflow_call:
+    inputs:
+      paths_ignore:
+        description: Paths to ignore.
+        type: string
+        default: |
+          - '.github/actions/spelling/**'
+          - 'bats/**'
+          - 'docs/**'
+          - '**.md'
+    outputs:
+      should_run:
+        description: Whether other steps should run.
+        value: ${{ jobs.check.outputs.should_run }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set baseline result
+      id: result
+      run: echo "should_run=true" >> "$GITHUB_OUTPUT"
+    - name: Determine paths to ignore
+      run: |
+        sudo apt-get update
+        sudo apt-get install --yes curl
+        curl -L -o yq \
+          https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+        chmod a+x yq
+        >>"$GITHUB_ENV" printf "PATHS_IGNORE=%s\n" \
+          "$(./yq 'map(":!/" + .) | .[]' <<< "$INPUT")"
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        INPUT: ${{ inputs.paths_ignore }}
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+    - name: Check for differences
+      run: >-
+        if [[ -z "$(
+          git diff --name-only
+          ${{ github.base_ref }} ${{ github.ref }}
+          -- ${{ env.PATHS_IGNORE }}
+        )" ]]; then
+          echo "should_run=false" >> "$GITHUB_OUTPUT"
+        fi
+      env:
+        PATHS_IGNORE: ${{ env.PATHS_IGNORE }}
+    outputs:
+      should_run: ${{ steps.result.outputs.should_run }}
