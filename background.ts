@@ -1,3 +1,5 @@
+/* This change causes E2E tests to run */
+
 import { spawn } from 'child_process';
 import fs from 'fs';
 import os from 'os';
