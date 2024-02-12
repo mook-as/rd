@@ -1,3 +1,5 @@
+This change doesn't trigger E2E tests
+
 # Rancher Desktop
 
 Rancher Desktop is an open-source project that brings Kubernetes and
