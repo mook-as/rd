@@ -93,7 +93,7 @@ if using_vz_emulation && ! supports_vz_emulation; then
 fi
 
 ########################################################################
-: "${RD_USE_WINDOWS_EXE:=false}"
+: "${RD_USE_WINDOWS_EXE:=$(bool is_windows)}"
 
 using_windows_exe() {
     is_true "$RD_USE_WINDOWS_EXE"
@@ -104,7 +104,7 @@ if using_windows_exe && ! is_windows; then
 fi
 
 ########################################################################
-: "${RD_USE_NETWORKING_TUNNEL:=false}"
+: "${RD_USE_NETWORKING_TUNNEL:=$(bool is_windows)}"
 
 using_networking_tunnel() {
     is_true "$RD_USE_NETWORKING_TUNNEL"
