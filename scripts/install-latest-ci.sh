@@ -56,23 +56,6 @@ download_artifact() {
     gh api "$API" > "$filename"
 }
 
-get_platform() {
-    case "$(uname -s)" in
-    Darwin)
-        echo darwin
-        return;;
-    MINGW*)
-        echo win32
-        return;;
-    esac
-    case "$(uname -r)" in
-    *-WSL2)
-        echo win32;;
-    *)
-        echo linux;;
-    esac
-}
-
 wslpath_from_win32_env() {
     if [[ "$(uname -s)" =~ MINGW* ]]; then
         # When running under WSL, the environment variables are set but to
