@@ -118,7 +118,7 @@ function isLog(it: StdioElementType): it is Log {
  * @param command The executable to spawn.
  * @param args Any arguments to the executable.
  * @param options Options to child_process.spawn();
- * @throws {SpawnError} When the command returns a failure
+ * @throws {SpawnError} When the command returns a failure.
  */
 
 export async function spawnFile(
@@ -286,4 +286,77 @@ export async function spawnFile(
   });
 
   return result;
+}
+
+interface SpawnFileWithRetryOptions extends SpawnOptionsLog {
+  stdio?: IOType | Log;
+}
+
+/**
+ * Call spawnFile, but retry the command if it succeeds with no output.
+ * @param command The executable to spawn.
+ * @param args Any arguments to the executable.
+ * @param options Options to child_process.spawn; only stderr may be configured,
+ *        not stdin (always empty) or stdout (always returned).
+ * @param options.tries The number of tries; defaults to three.
+ * @throws {SpawnError} When the command returns a failure.
+ */
+
+export async function spawnFileWithRetry(
+  command: string,
+): Promise<{ stdout: string }>;
+export async function spawnFileWithRetry(
+  command: string,
+  options: SpawnOptionsWithStdioLog<'ignore' | 'inherit' | Log> & SpawnOptionsEncoding & { tries?: number },
+): Promise<{ stdout: string }>;
+export async function spawnFileWithRetry(
+  command: string,
+  options: SpawnOptionsWithStdioLog<'pipe'> & SpawnOptionsEncoding & { tries?: number },
+): Promise<{ stdout: string, stderr: string }>;
+export async function spawnFileWithRetry(
+  command: string,
+  args: string[],
+): Promise<{ stdout: string }>;
+export async function spawnFileWithRetry(
+  command: string,
+  args: string[],
+  options: SpawnOptionsWithStdioLog<'ignore' | 'inherit' | Log> & SpawnOptionsEncoding & { tries?: number },
+): Promise<{ stdout: string }>;
+export async function spawnFileWithRetry(
+  command: string,
+  args: string[],
+  options: SpawnOptionsWithStdioLog<'pipe'> & SpawnOptionsEncoding & { tries?: number },
+): Promise<{ stdout: string, stderr: string }>;
+
+export async function spawnFileWithRetry(
+  command: string,
+  args?: string[] | SpawnFileWithRetryOptions & SpawnOptionsEncoding & { tries?: number},
+  options: SpawnFileWithRetryOptions & SpawnOptionsEncoding & { tries?: number } = {},
+): Promise<{stdout: string, stderr?: string}> {
+  let finalArgs: string[] = [];
+
+  if (args && !Array.isArray(args)) {
+    options = args;
+    finalArgs = [];
+  } else {
+    finalArgs = args ?? [];
+  }
+
+  const maxTries = options?.tries ?? 3;
+  let result: { stdout: string; stderr?: string } = { stdout: '' };
+
+  for (let tries = 0; tries < maxTries; ++tries) {
+    if (options?.stdio) {
+      result = await spawnFile(command, finalArgs, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+    } else {
+      result = await spawnFile(command, finalArgs, { ...options, stdio: ['ignore', 'pipe', 'inherit'] });
+    }
+    if (result.stdout.trim()) {
+      return result;
+    }
+  }
+
+  throw new SpawnError([command].concat(finalArgs), {
+    code: null, signal: null, ...result,
+  });
 }

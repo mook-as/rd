@@ -434,9 +434,9 @@ export default class LimaBackend extends events.EventEmitter implements VMBacken
         throw new Error('Virtualization does not appear to be supported on your machine.');
       }
     } else if (os.platform().startsWith('darwin')) {
-      const { stdout } = await childProcess.spawnFile(
+      const { stdout } = await childProcess.spawnFileWithRetry(
         'sysctl', ['kern.hv_support'],
-        { stdio: ['inherit', 'pipe', console] });
+        { stdio: console });
 
       if (!/:\s*1$/.test(stdout.trim())) {
         console.log(`Virtualization support error: got ${ stdout.trim() }`);
