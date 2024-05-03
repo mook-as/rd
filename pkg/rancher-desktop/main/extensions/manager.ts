@@ -576,19 +576,18 @@ export class ExtensionManagerImpl implements ExtensionManager {
   }
 }
 
-async function getExtensionManager(): Promise<ExtensionManager | undefined>;
-async function getExtensionManager(client: ContainerEngineClient, cfg: RecursiveReadonly<Settings>): Promise<ExtensionManager>;
-async function getExtensionManager(client?: ContainerEngineClient, cfg?: RecursiveReadonly<Settings>): Promise<ExtensionManager | undefined> {
-  if (!client || manager?.client === client) {
-    if (!client && !manager) {
-      console.debug(`Warning: cached client missing, returning nothing`);
-    }
-
-    return manager;
+function getExtensionManager(): Promise<ExtensionManager> {
+  if (!manager) {
+    throw new Error('No existing extension manager!');
   }
 
-  if (!cfg) {
-    throw new Error(`getExtensionManager called without configuration`);
+  return Promise.resolve(manager);
+}
+
+export async function initializeExtensionsManager(client: ContainerEngineClient, cfg: RecursiveReadonly<Settings>): Promise<void> {
+  if (manager?.client === client) {
+    // The manager is already the correct one; do nothing.
+    return;
   }
 
   await manager?.shutdown();
@@ -597,8 +596,6 @@ async function getExtensionManager(client?: ContainerEngineClient, cfg?: Recursi
   manager = new ExtensionManagerImpl(client, cfg.containerEngine.name === ContainerEngine.CONTAINERD);
 
   await manager.init(cfg);
-
-  return manager;
 }
 
 export default getExtensionManager;

@@ -552,9 +552,9 @@ async function startK8sManager() {
   }
   await k8smanager.start(cfg);
 
-  const getEM = (await import('@pkg/main/extensions/manager')).default;
+  const { initializeExtensionsManager } = await import('@pkg/main/extensions/manager');
 
-  await getEM(k8smanager.containerEngineClient, cfg);
+  await initializeExtensionsManager(k8smanager.containerEngineClient, cfg);
   window.send('extensions/changed');
 }
 
@@ -1493,7 +1493,7 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
 
   async listExtensions() {
     const extensionManager = await getExtensionManager();
-    const extensions = await extensionManager?.getInstalledExtensions() ?? [];
+    const extensions = await extensionManager.getInstalledExtensions();
     const entries = await Promise.all(extensions.map(async x => [x.id, {
       version:  x.version,
       metadata: await x.metadata,
@@ -1505,13 +1505,8 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
 
   async installExtension(image: string, state: 'install' | 'uninstall'): Promise<{status: number, data?: any}> {
     const em = await getExtensionManager();
-    const extension = await em?.getExtension(image, { preferInstalled: state === 'uninstall' });
+    const extension = await em.getExtension(image, { preferInstalled: state === 'uninstall' });
 
-    if (!extension) {
-      console.debug(`Failed to install extension ${ image }: could not get extension.`);
-
-      return { status: 503 };
-    }
     if (state === 'install') {
       console.debug(`Installing extension ${ image }...`);
       try {
