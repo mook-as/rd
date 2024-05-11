@@ -1379,14 +1379,16 @@ class BackgroundCommandWorker implements CommandWorkerInterface {
 
     // Update image allow list patterns, just in case the backend doesn't need restarting
     // TODO: review why this block is needed at all
-    if (cfg.containerEngine.allowedImages.enabled) {
-      const allowListConf = BackendHelper.createAllowedImageListConf(cfg.containerEngine.allowedImages);
+    if ([State.STARTED, State.DISABLED].includes(k8smanager.state)) {
+      if (cfg.containerEngine.allowedImages.enabled) {
+        const allowListConf = BackendHelper.createAllowedImageListConf(cfg.containerEngine.allowedImages);
 
-      await k8smanager.executor.writeFile(allowedImagesConf, allowListConf, 0o644);
-      await k8smanager.executor.execCommand({ root: true }, rcService, '--ifstarted', 'rd-openresty', 'reload');
-    } else {
-      await k8smanager.executor.execCommand({ root: true }, rcService, '--ifstarted', 'rd-openresty', 'stop');
-      await k8smanager.executor.execCommand({ root: true }, 'rm', '-f', allowedImagesConf);
+        await k8smanager.executor.writeFile(allowedImagesConf, allowListConf, 0o644);
+        await k8smanager.executor.execCommand({ root: true }, rcService, '--ifstarted', 'rd-openresty', 'reload');
+      } else {
+        await k8smanager.executor.execCommand({ root: true }, rcService, '--ifstarted', 'rd-openresty', 'stop');
+        await k8smanager.executor.execCommand({ root: true }, 'rm', '-f', allowedImagesConf);
+      }
     }
 
     await k8smanager.handleSettingsUpdate(newConfig);
