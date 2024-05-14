@@ -158,7 +158,7 @@ export class Moproxy implements Dependency, GitHubDependency {
 
 export class WSLDistro implements Dependency, GitHubDependency {
   name = 'WSLDistro';
-  githubOwner = 'rancher-sandbox';
+  githubOwner = 'mook-as';
   githubRepo = 'rancher-desktop-wsl-distro';
 
   async download(context: DownloadContext): Promise<void> {
