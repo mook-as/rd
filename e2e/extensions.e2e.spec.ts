@@ -68,7 +68,18 @@ test.describe.serial('Extensions', () => {
     console = new Log(path.basename(__filename, '.ts'), reportAsset(testInfo, 'log'));
   });
 
-  test.afterAll(({ colorScheme }, testInfo) => teardown(app, testInfo));
+  test.afterAll(async({ colorScheme }, testInfo) => {
+    await teardown(app, testInfo);
+    if (process.platform === 'win32') {
+      try {
+        const { stdout } = await spawnFile('wsl.exe', ['-d', 'rancher-desktop', '--exec', '/sbin/ip', 'link'], { stdio: 'pipe' });
+
+        console.log(stdout);
+      } catch (ex) {
+        console.error(ex);
+      }
+    }
+  });
 
   // Set things up so console messages from the UI gets logged too.
   let currentTestInfo: TestInfo;
