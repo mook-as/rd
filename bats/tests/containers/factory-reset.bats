@@ -9,7 +9,8 @@ local_setup_file() {
 }
 
 @test 'Start up Rancher Desktop' {
-    start_application
+    start_container_engine
+    wait_for_container_engine
 }
 
 @test 'Verify that the expected directories were created' {
@@ -73,7 +74,8 @@ local_setup_file() {
 }
 
 @test 'Start Rancher Desktop 2' {
-    start_application
+    start_container_engine
+    wait_for_container_engine
 }
 
 @test 'factory reset - keep cached k8s images' {
@@ -109,7 +111,8 @@ local_setup_file() {
 }
 
 @test 'Start Rancher Desktop 3' {
-    start_application
+    start_container_engine
+    wait_for_container_engine
 }
 
 @test 'factory reset - delete cached k8s images' {

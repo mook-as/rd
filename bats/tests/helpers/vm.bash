@@ -252,17 +252,6 @@ start_kubernetes() {
         "$@"
 }
 
-start_application() {
-    start_kubernetes
-    wait_for_kubelet
-
-    # the docker context "rancher-desktop" may not have been written
-    # even though the apiserver is already running
-    if using_docker; then
-        wait_for_container_engine
-    fi
-}
-
 launch_the_application() {
     local args=("$@")
     trace "$*"

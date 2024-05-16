@@ -5,7 +5,8 @@ load '../helpers/load'
 }
 
 @test 'Start up Rancher Desktop' {
-    start_application
+    start_container_engine
+    wait_for_container_engine
 }
 
 @test 'Verify that initial Behavior is all set to false' {

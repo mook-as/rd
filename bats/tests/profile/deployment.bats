@@ -78,8 +78,7 @@ verify_settings() {
 }
 
 install_extensions() {
-    # Extension install doesn't work until startup is fully complete.
-    wait_for_backend
+    wait_for_extension_manager
 
     RD_TIMEOUT=120s run rdctl extension install "$FORBIDDEN_EXTENSION"
     "${refute}_success"
@@ -98,7 +97,7 @@ install_extensions() {
 @test 'start up with NO profiles' {
     RD_USE_PROFILE=false
     RD_USE_IMAGE_ALLOW_LIST=false
-    start_application
+    start_kubernetes
 }
 
 @test 'verify there were NO profiles created' {
@@ -110,7 +109,9 @@ install_extensions() {
 }
 
 @test 'verify all extensions can be installed' {
+    wait_for_container_engine
     wait_for_kubelet
+    wait_for_extension_manager
     before install_extensions
 }
 
