@@ -3,6 +3,9 @@ set -o errexit -o nounset -o pipefail
 # RD_HELPERS_LOADED is set when bats/helpers/load.bash has been loaded
 RD_HELPERS_LOADED=1
 
+# on MSYS, we opt-in to argument conversion.
+export MSYS2_ARG_CONV_EXCL='*'
+
 absolute_path() {
     (
         cd "$1"

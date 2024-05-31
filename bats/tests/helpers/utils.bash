@@ -335,6 +335,13 @@ create_file() {
         cat >"$dest"
         return
     fi
+    if [[ "$(uname --operating-system)" = "Msys" ]]; then
+        # We don't need to worry about creating files from msys, because it
+        # makes Win32 API calls under the hood.
+        mkdir -p "$(dirname "$dest")"
+        cat >"$dest"
+        return
+    fi
 
     local contents # Base64 encoded file contents
     contents="$(base64)" || return

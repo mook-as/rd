@@ -128,13 +128,17 @@ factory_reset() {
             true
         fi
     fi
-    if is_windows && wsl true >/dev/null; then
-        wsl sudo ip link delete docker0 || :
-        wsl sudo ip link delete nerdctl0 || :
-        # reset iptables to original state
-        flush_iptables
-        clear_iptables_chain "CNI"
-        clear_iptables_chain "KUBE"
+    if is_windows; then
+        if [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
+            wsl sudo ip link delete docker0 || :
+            wsl sudo ip link delete nerdctl0 || :
+            # reset iptables to original state
+            flush_iptables
+            clear_iptables_chain "CNI"
+            clear_iptables_chain "KUBE"
+        else
+            wsl.exe --shutdown
+        fi
     fi
     rdctl factory-reset "$@"
     setup_ramdisk
@@ -224,7 +228,7 @@ start_container_engine() {
         # add_profile_list containerEngine.allowedImages.patterns "$registry"
     else
         local wsl_integrations="{}"
-        if is_windows; then
+        if is_windows && [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
             wsl_integrations="{\"$WSL_DISTRO_NAME\":true}"
         fi
         create_file "$PATH_CONFIG_FILE" <<EOF

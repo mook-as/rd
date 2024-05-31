@@ -89,10 +89,28 @@ if is_linux; then
 fi
 
 wslpath_from_win32_env() {
-    # The cmd.exe _sometimes_ returns an empty string when invoked in a subshell
-    # wslpath "$(cmd.exe /c "echo %$1%" 2>/dev/null)" | tr -d "\r"
-    # Let's see if powershell.exe avoids this issue
-    wslpath "$(powershell.exe -Command "Write-Output \${Env:$1}")" | tr -d "\r"
+    case "$(uname --operating-system)" in
+    Msys*)
+        case "$1" in
+        APPDATA)      cygpath --unix --folder 26;; # CSIDL_APPDATA
+        LOCALAPPDATA) cygpath --unix --folder 28;; # CSIDL_LOCAL_APPDATA
+        SystemRoot)   cygpath --unix --folder 36;; # CSIDL_WINDOWS
+        ProgramFiles) cygpath --unix --folder 38;; # CSIDL_PROGRAM_FILES
+        USERPROFILE)  cygpath --unix --folder 40;; # CSIDL_PROFILE
+        TEMP)         printf "%s/Temp\n" "$(wslpath_from_win32_env LOCALAPPDATA)";;
+        *)
+            echo "Unknown Windows folder $1" >&2
+            exit 1
+            ;;
+        esac
+        ;;
+    *)
+        # The cmd.exe _sometimes_ returns an empty string when invoked in a subshell
+        # wslpath "$(cmd.exe /c "echo %$1%" 2>/dev/null)" | tr -d "\r"
+        # Let's see if powershell.exe avoids this issue
+        wslpath "$(powershell.exe -Command "Write-Output \${Env:$1}")" | tr -d "\r"
+        ;;
+    esac
 }
 
 if is_windows; then
@@ -127,7 +145,12 @@ fi
 host_path() {
     local path=$1
     if using_windows_exe; then
-        path=$(wslpath -w "$path")
+        case "$(uname --operating-system)" in
+        Msys*)
+            path=$(cygpath --windows "$path");;
+        *)
+            path=$(wslpath -w "$path");;
+        esac
     fi
     echo "$path"
 }

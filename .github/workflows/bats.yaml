@@ -27,10 +27,6 @@ on:
         description: Package run ID override; leave empty to use latest.
         default: ''
         type: string
-      rd-use-networking-tunnel:
-        description: Use networking tunnel (on Windows)
-        default: false
-        type: boolean
   schedule:
   - cron: '0 8 * * 1-5' # 8AM UTC weekdays as a baseline
 
@@ -142,21 +138,15 @@ jobs:
       shell: bash
       run: brew install --force bash coreutils
 
-    - name: "Windows: Install WSL2 Distribution"
+    - name: "Windows: Install prerequisites"
       if: runner.os == 'Windows'
-      shell: pwsh
+      shell: bash
       run: |
-        # Install Debian, but do not launch it
-        wsl --install Debian --no-launch
-        # Initialize Debian, without going through any first-time setup
-        debian.exe install --root
-
-    - name: "Windows: Install prerequisites in WSL"
-      if: runner.os == 'Windows'
-      shell: pwsh
-      run: >-
-        wsl.exe -d Debian --exec /usr/bin/env DEBIAN_FRONTEND=noninteractive
-        sh -c 'apt-get update && apt-get install --yes coreutils curl'
+        # jq isn't available in msys; copy it to /usr/local/bin/ so it is.
+        jq=$(powershell.exe -Command '$(Get-Command jq).Source')
+        jq_cygpath=$(cygpath --unix "$jq")
+        mkdir -p /usr/local/bin/
+        cp "$jq_cygpath" /usr/local/bin/
 
     - name: Set log directory
       shell: bash
@@ -165,10 +155,10 @@ jobs:
         mkdir logs
     - name: "Windows: Override log directory"
       if: runner.os == 'Windows'
-      shell: powershell
+      shell: bash
       run: >-
-        wsl.exe -d Debian -- echo 'LOGS_DIR=$(pwd)'
-        | Out-File -Encoding ASCII -Append "$ENV:GITHUB_ENV"
+        printf "LOGS_DIR=%s\n" >> "$GITHUB_ENV" \
+          "$(cygpath --absolute --windows --long-name "$PWD")"
       working-directory: logs
 
     - name: Normalize test name
@@ -199,13 +189,13 @@ jobs:
       shell: bash
       run: echo "BATS_COMMAND=$BATS_COMMAND" >> "$GITHUB_ENV"
       env:
-        BATS_COMMAND: wsl.exe -d Debian --exec
+        BATS_COMMAND: exec
 
     - name: Run BATS
+      shell: bash
       # We use ${{ env.BATS_COMMAND }} instead of ${BATS_COMMAND} to let the
       # shell parse the command, instead of doing it via expansion which is then
-      # parsed differently (--server-args isn't kept as one word).  Also, we
-      # need to use the env.* form because PowerShell uses ${ENV:VAR} instead.
+      # parsed differently (--server-args isn't kept as one word).
       run: >-
         ${{ env.BATS_COMMAND }}
         ./bats-core/bin/bats
@@ -226,7 +216,6 @@ jobs:
         RD_USE_GHCR_IMAGES:       "true"
         RD_USE_RAMDISK:           "true"
         RD_USE_WINDOWS_EXE:       "${{ runner.os == 'Windows' }}"
-        RD_USE_NETWORKING_TUNNEL: "${{ runner.os == 'Windows' && inputs.rd-use-networking-tunnel == true }}"
         WSLENV: "\
           GITHUB_TOKEN:\
           RD_CAPTURE_LOGS:\
@@ -236,7 +225,6 @@ jobs:
           RD_USE_GHCR_IMAGES:\
           RD_USE_RAMDISK:\
           RD_USE_WINDOWS_EXE:\
-          RD_USE_NETWORKING_TUNNEL:\
           "
       working-directory: bats
       timeout-minutes: 120

@@ -17,6 +17,9 @@ Linux)
         OS=linux
     fi
     ;;
+MINGW*)
+    OS=windows
+    ;;
 *)
     echo "Unexpected uname: $UNAME" >&2
     exit 1
