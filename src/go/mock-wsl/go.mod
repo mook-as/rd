@@ -1,3 +1,4 @@
+// This is a comment
 module github.com/rancher-sandbox/rancher-desktop/e2e/assets/mock-wsl
 
 go 1.21
