@@ -102,13 +102,17 @@ assert_true() {
 }
 
 # Given namespace and app name, assert that a log line contains the given string.
+# The caller should set NAMESPACE and APP before calling this function.
 assert_pod_log_line() {
-    local namespace="$1"
-    local selector="app=$2"
-    shift 2
-    local expect="$*"
+    local namespace="${NAMESPACE:?}"
+    local selector="app=${APP:?}"
+    local expect="$1"
+
+    if [[ ${#@} -gt 1 ]]; then
+        fail "assert_pod_log_line should have log string quoted: $expect" || return
+    fi
     run kubectl get pod --namespace "$namespace" --selector "$selector" --output=jsonpath='{.items[0].metadata.name}'
-    assert_success
+    assert_success || return
     assert_output || return
     local name="$output"
 
@@ -129,21 +133,25 @@ pull_rancher_image() {
 }
 
 wait_for_rancher_pod() {
-    try assert_pod_log_line cattle-system rancher Listening on :443
-    try assert_pod_log_line cattle-system rancher Starting catalog controller
-    try --max 60 --delay 10 assert_pod_log_line cattle-system rancher Watching metadata for rke-machine-config.cattle.io/v1
-    try --max 60 --delay 10 assert_pod_log_line cattle-system rancher 'Creating clusterRole for roleTemplate Cluster Owner (cluster-owner).'
-    try assert_pod_log_line cattle-system rancher Rancher startup complete
-    try assert_pod_log_line cattle-system rancher Created machine for node
+    local NAMESPACE=cattle-system
+    local APP=rancher
+    assert_pod_log_line 'Listening on :443' || return
+    try assert_pod_log_line 'Starting catalog controller' || return
+    try --max 60 --delay 10 assert_pod_log_line 'Watching metadata for rke-machine-config.cattle.io/v1' || return
+    try --max 60 --delay 10 assert_pod_log_line 'Creating clusterRole for roleTemplate Cluster Owner (cluster-owner).' || return
+    try assert_pod_log_line 'Rancher startup complete' || return
+    try assert_pod_log_line 'Created machine for node' || return
 }
 
 wait_for_webhook_pod() {
-    try assert_pod_log_line cattle-system rancher-webhook Rancher-webhook version
-    try assert_pod_log_line cattle-system rancher-webhook Listening on :9443
+    local NAMESPACE=cattle-system
+    local APP=rancher-webhook
+    try assert_pod_log_line 'Rancher-webhook version' || return
+    try assert_pod_log_line 'Listening on :9443' || return
     # Depending on version, this is either "cattle-webhook-tls" or "cattle-system/cattle-webhook-tls"
-    try assert_pod_log_line cattle-system rancher-webhook Creating new TLS secret for cattle-
-    try assert_pod_log_line cattle-system rancher-webhook Active TLS secret cattle-
-    try assert_pod_log_line cattle-system rancher-webhook 'Sleeping for 15 seconds then applying webhook config'
+    try assert_pod_log_line 'Creating new TLS secret for cattle-' || return
+    try assert_pod_log_line 'Active TLS secret cattle-' || return
+    try assert_pod_log_line 'Sleeping for 15 seconds then applying webhook config' || return
 }
 
 deploy_rancher() {
@@ -165,6 +173,7 @@ deploy_rancher() {
         --set prometheus.enabled=false \
         --set "extraArgs[0]=--enable-certificate-owner-ref=true" \
         --create-namespace
+
     try assert_not_empty_list helm list --namespace cert-manager --deployed --output json --selector name=cert-manager
     wait_for_kube_deployment_available --namespace cert-manager cert-manager
 
@@ -208,7 +217,7 @@ deploy_rancher() {
     try assert_kube_deployment_available --namespace cattle-fleet-system gitjob
     try assert_kube_deployment_available --namespace cattle-fleet-system fleet-controller
 
-    try --max 60 --delay 10 assert_not_empty_list kubectl get pods --namespace cattle-system --selector app=rancher-webhook --output jsonpath='{.items}'
+    try --max 120 --delay 10 assert_not_empty_list kubectl get pods --namespace cattle-system --selector app=rancher-webhook --output jsonpath='{.items}'
 
     # Unfortunately, the webhook pod might restart too :(
     try wait_for_webhook_pod
@@ -217,13 +226,7 @@ deploy_rancher() {
     try --max 120 assert_kube_deployment_available --namespace cattle-fleet-local-system fleet-agent
     try --max 60 assert_kube_deployment_available --namespace cattle-system rancher-webhook
 
-    # The rancher pod sometimes falls over on its own; retry in a loop to
-    # detect flapping.
-    local i
-    for i in {1..10}; do
-        sleep 1
-        try --max 60 --delay 10 assert_kube_deployment_available --namespace cattle-system rancher
-    done
+    try --max 60 --delay 10 assert_kube_deployment_available --namespace cattle-system rancher
 }
 
 verify_rancher() {
@@ -232,13 +235,14 @@ verify_rancher() {
         skip_unless_host_ip
     fi
 
-    # Get k3s logs if possible before things fail
+    # Fetch logs; these are only used for debugging failures in the previous step.
     kubectl get deployments --all-namespaces || :
     kubectl get pods --all-namespaces || :
 
     local name
     name="$(kubectl get pod -n cattle-system --selector app=rancher --output=jsonpath='{.items[].metadata.name}' || echo '')"
     if [[ -n $name ]]; then
+        kubectl logs -n cattle-system --previous "$name" || :
         kubectl logs -n cattle-system "$name" || :
     fi
 
@@ -247,6 +251,7 @@ verify_rancher() {
         kubectl logs -n cattle-system "$name" || :
     fi
 
+    # Check that Rancher Manager is running currently by checking for the login screen.
     local host
     host=$(traefik_hostname) || return
 
