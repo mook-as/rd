@@ -7,6 +7,17 @@ local_setup() {
     needs_port 80
 }
 
+@test 'install Windows redistributable' {
+    if ! is_windows; then
+        skip "this step only applies to Windows"
+    fi
+    # On Windows, spin.exe requires the MSVC redistributables.
+    curl -L -o vc_redist.x64.exe https://aka.ms/vs/17/release/vc_redist.x64.exe
+    chmod a+x vc_redist.x64.exe
+    ./vc_redist.x64.exe /install /passive /norestart
+    rm vc_redist.x64.exe
+}
+
 @test 'start k8s with spinkube' {
     factory_reset
     start_kubernetes \
