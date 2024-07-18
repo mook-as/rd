@@ -30,9 +30,9 @@ import (
 )
 
 const (
-	queryTimeout           = 300 * time.Millisecond
-	desiredStateTimeout    = 10 * time.Second
-	SERVICE_MINIMAL_ACCESS = windows.SERVICE_QUERY_STATUS | windows.SERVICE_START | windows.SERVICE_STOP | windows.SERVICE_INTERROGATE
+	queryTimeout         = 300 * time.Millisecond
+	desiredStateTimeout  = 10 * time.Second
+	serviceDesiredAccess = windows.SERVICE_QUERY_STATUS | windows.SERVICE_START | windows.SERVICE_STOP | windows.SERVICE_INTERROGATE
 )
 
 // Start Service start the Rancher Desktop Privileged Service process in Windows Services
@@ -102,14 +102,13 @@ func disconnect(m *mgr.Mgr) {
 	_ = m.Disconnect()
 }
 
-// connect is same as mgr.OpenService with minimal
-// access control
+// connect is same as mgr.OpenService with the access we require.
 func openService(svcHandle windows.Handle, name string) (*mgr.Service, error) {
 	ptr, err := syscall.UTF16PtrFromString(name)
 	if err != nil {
 		return nil, err
 	}
-	h, err := windows.OpenService(svcHandle, ptr, SERVICE_MINIMAL_ACCESS)
+	h, err := windows.OpenService(svcHandle, ptr, serviceDesiredAccess)
 	if err != nil {
 		return nil, err
 	}

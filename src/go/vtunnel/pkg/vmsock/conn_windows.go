@@ -86,7 +86,7 @@ func (h *HostConnector) handleConn(vConn net.Conn) {
 }
 
 func (h *HostConnector) vsockListen() (net.Listener, error) {
-	vmGuid, err := h.vmGuid()
+	vmGUID, err := h.vmGUID()
 	if err != nil {
 		return nil, fmt.Errorf("vsockListen, could not determine VM GUID: %v", err)
 	}
@@ -96,17 +96,17 @@ func (h *HostConnector) vsockListen() (net.Listener, error) {
 	}
 
 	addr := hvsock.Addr{
-		VMID:      vmGuid,
+		VMID:      vmGUID,
 		ServiceID: svcPort,
 	}
 
 	return hvsock.Listen(addr)
 }
 
-// vmGuid retrieves the GUID for a correct hyper-v VM (most likely WSL).
+// vmGUID retrieves the GUID for a correct hyper-v VM (most likely WSL).
 // It performs a handshake with a running peer process in the WSL distro
 // to make sure we establish the AF_VSOCK connection with a right VM.
-func (h *HostConnector) vmGuid() (hvsock.GUID, error) {
+func (h *HostConnector) vmGUID() (hvsock.GUID, error) {
 	key, err := registry.OpenKey(
 		registry.LOCAL_MACHINE,
 		`SOFTWARE\Microsoft\Windows NT\CurrentVersion\HostComputeService\VolatileStore\ComputeSystem`,
@@ -129,25 +129,25 @@ func (h *HostConnector) vmGuid() (hvsock.GUID, error) {
 	defer close(done)
 
 	for _, name := range names {
-		vmGuid, err := hvsock.GUIDFromString(name)
+		vmGUID, err := hvsock.GUIDFromString(name)
 		if err != nil {
 			logrus.Errorf("invalid VM name: [%s], err: %v", name, err)
 			continue
 		}
-		go h.handshake(vmGuid, found, done)
+		go h.handshake(vmGUID, found, done)
 	}
-	return tryFindGuid(found)
+	return tryFindGUID(found)
 }
 
 // handshake attempts to perform a handshake by verifying the seed with a running
 // af_vsock peer in WSL distro, it attempts once per second
-func (h *HostConnector) handshake(vmGuid hvsock.GUID, found chan<- hvsock.GUID, done <-chan bool) {
+func (h *HostConnector) handshake(vmGUID hvsock.GUID, found chan<- hvsock.GUID, done <-chan bool) {
 	svcPort, err := hvsock.GUIDFromString(winio.VsockServiceID(h.PeerHandshakePort).String())
 	if err != nil {
 		logrus.Errorf("hostHandshake parsing svc port: %v", err)
 	}
 	addr := hvsock.Addr{
-		VMID:      vmGuid,
+		VMID:      vmGUID,
 		ServiceID: svcPort,
 	}
 
@@ -156,7 +156,7 @@ func (h *HostConnector) handshake(vmGuid hvsock.GUID, found chan<- hvsock.GUID, 
 	for {
 		select {
 		case <-done:
-			logrus.Infof("attempt to handshake with [%s], goroutine is terminated", vmGuid.String())
+			logrus.Infof("attempt to handshake with [%s], goroutine is terminated", vmGUID.String())
 			return
 		case <-attemptInterval.C:
 			conn, err := hvsock.Dial(addr)
@@ -173,24 +173,24 @@ func (h *HostConnector) handshake(vmGuid hvsock.GUID, found chan<- hvsock.GUID, 
 				logrus.Errorf("hosthandshake closing connection: %v", err)
 			}
 			if seed == SeedPhrase {
-				logrus.Infof("successfully established a handshake with a peer: %s on port: %v", vmGuid.String(), h.PeerHandshakePort)
-				found <- vmGuid
+				logrus.Infof("successfully established a handshake with a peer: %s on port: %v", vmGUID.String(), h.PeerHandshakePort)
+				found <- vmGUID
 				return
 			}
-			logrus.Infof("hosthandshake failed to match the seed phrase with a peer running in: %s", vmGuid.String())
+			logrus.Infof("hosthandshake failed to match the seed phrase with a peer running in: %s", vmGUID.String())
 			return
 		}
 	}
 }
 
-// tryFindGuid waits on a found channel to receive a GUID until
+// tryFindGUID waits on a found channel to receive a GUID until
 // deadline of 10s is reached
-func tryFindGuid(found chan hvsock.GUID) (hvsock.GUID, error) {
+func tryFindGUID(found chan hvsock.GUID) (hvsock.GUID, error) {
 	bailOut := time.After(time.Second * timeoutSeconds)
 	for {
 		select {
-		case vmGuid := <-found:
-			return vmGuid, nil
+		case vmGUID := <-found:
+			return vmGUID, nil
 		case <-bailOut:
 			return hvsock.GUIDZero, errors.New("could not find vsock-peer process on any hyper-v VM(s)")
 		}

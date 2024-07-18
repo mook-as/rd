@@ -27,6 +27,7 @@ import (
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
+//nolint:stylecheck // Wind32 constants
 const (
 	SECURITY_DESCRIPTOR_REVISION = 1
 	DACL_SECURITY_INFORMATION    = 4

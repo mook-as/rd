@@ -14,7 +14,7 @@ import (
 
 const (
 	Version    = "1.1.0"
-	ApiVersion = "v1"
+	APIVersion = "v1"
 )
 
 var ErrConnectionRefused = errors.New("connection refused")

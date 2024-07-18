@@ -373,6 +373,8 @@ jitconfig
 joycelin
 jpe
 jsmith
+JSONOr
+JSONTo
 julianb
 karl
 Kaspersky
