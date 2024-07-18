@@ -1,12 +1,12 @@
 module github.com/rancher-sandbox/rancher-desktop-networking
 
-go 1.21
+go 1.22.0
 
 toolchain go1.22.2
 
 require (
 	github.com/Microsoft/go-winio v0.6.2
-	github.com/containers/gvisor-tap-vsock v0.6.2
+	github.com/containers/gvisor-tap-vsock v0.7.3
 	github.com/docker/go-connections v0.4.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/google/gopacket v1.1.19
@@ -22,18 +22,17 @@ require (
 	golang.org/x/net v0.25.0
 	golang.org/x/sync v0.7.0
 	golang.org/x/sys v0.22.0
-	gvisor.dev/gvisor v0.0.0-20221216231429-a78e892a26d2
+	gvisor.dev/gvisor v0.0.0-20231023213702-2691a8f9b1cf
 )
 
 require (
 	github.com/apparentlymart/go-cidr v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
-	github.com/google/btree v1.0.1 // indirect
+	github.com/google/btree v1.1.2 // indirect
 	github.com/insomniacslk/dhcp v0.0.0-20220504074936-1ca156eafb9f // indirect
 	github.com/kr/pretty v0.3.1 // indirect
-	github.com/miekg/dns v1.1.55 // indirect
-	github.com/onsi/gomega v1.31.0 // indirect
+	github.com/miekg/dns v1.1.58 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rancher-sandbox/rancher-desktop/src/go/wsl-helper v0.0.0-20220712232929-bac01a348036 // indirect
