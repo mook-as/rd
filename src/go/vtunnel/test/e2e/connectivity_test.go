@@ -149,13 +149,13 @@ func TestNamedPipeConnect(t *testing.T) {
 
 	t.Logf("Sending a request to npipe [%v] via vtunnel peer process in [%v] over: 127.0.0.1:%v", nPipeFile1, wslDistroName, peerTCPPortN)
 	peerAddr1 := fmt.Sprintf("127.0.0.1:%v", peerTCPPortN)
-	out, err := cmdRunWithOutput("wsl", "--distribution", wslDistroName, "--exec", "curl", "--http0.9", "--verbose", "--fail-with-body", peerAddr1)
+	out, err := runWSLWithOutput("--distribution", wslDistroName, "--exec", "curl", "--http0.9", "--verbose", "--fail-with-body", peerAddr1)
 	require.NoError(t, err, "failed sending request to vtunnel peer process")
 	require.Contains(t, out, fmt.Sprintf("vtunnel named pipe %v called.", nPipeFile1))
 
 	t.Logf("Sending a request to npipe [%v] via vtunnel peer process in [%v] over: 127.0.0.1:%v", nPipeFile2, wslDistroName, peerTCPPortN2)
 	peerAddr2 := fmt.Sprintf("127.0.0.1:%v", peerTCPPortN2)
-	out, err = cmdRunWithOutput("wsl", "--distribution", wslDistroName, "--exec", "curl", "--http0.9", "--verbose", "--fail-with-body", peerAddr2)
+	out, err = runWSLWithOutput("--distribution", wslDistroName, "--exec", "curl", "--http0.9", "--verbose", "--fail-with-body", peerAddr2)
 	require.NoError(t, err, "failed sending request to vtunnel peer process")
 	require.Contains(t, out, fmt.Sprintf("vtunnel named pipe %v called.", nPipeFile2))
 }
@@ -238,13 +238,13 @@ func TestTCPConnect(t *testing.T) {
 
 	t.Logf("Sending a request to vtunnel peer process in [%v] over: 127.0.0.1:%v", wslDistroName, peerTCPPortT)
 	peerAddr1 := fmt.Sprintf("127.0.0.1:%v", peerTCPPortT)
-	out, err := cmdRunWithOutput("wsl", "--distribution", wslDistroName, "--exec", "curl", "--verbose", "--fail-with-body", peerAddr1)
+	out, err := runWSLWithOutput("--distribution", wslDistroName, "--exec", "curl", "--verbose", "--fail-with-body", peerAddr1)
 	require.NoError(t, err, "Failed sending request to vtunnel peer process")
 	require.Contains(t, out, "vtunnel host 1 called.")
 
 	t.Logf("Sending a request to vtunnel peer process in [%v] over: 127.0.0.1:%v", wslDistroName, peerTCPPortT2)
 	peerAddr2 := fmt.Sprintf("127.0.0.1:%v", peerTCPPortT2)
-	out, err = cmdRunWithOutput("wsl", "--distribution", wslDistroName, "--exec", "curl", "--verbose", "--fail-with-body", peerAddr2)
+	out, err = runWSLWithOutput("--distribution", wslDistroName, "--exec", "curl", "--verbose", "--fail-with-body", peerAddr2)
 	require.NoError(t, err, "Failed sending request to vtunnel peer process")
 	require.Contains(t, out, "vtunnel host 2 called.")
 }
@@ -295,7 +295,7 @@ func TestMain(m *testing.M) {
 	err = confirm(func() bool {
 		// Run `wslpath` to see if the distribution is registered; this avoids
 		// parsing the output of `wsl --list` to avoid having to handle UTF-16.
-		out, err := cmdRunWithOutput("wsl", "--distribution", wslDistroName, "--exec", "/bin/wslpath", ".")
+		out, err := runWSLWithOutput("--distribution", wslDistroName, "--exec", "/bin/wslpath", ".")
 		if err != nil {
 			return false
 		}
@@ -363,9 +363,9 @@ func buildBinaries(path, goos, tmpDir string) error {
 	return buildCmd.Run()
 }
 
-func cmdRunWithOutput(command string, args ...string) (string, error) {
+func runWSLWithOutput(args ...string) (string, error) {
 	var outBuf, errBuf bytes.Buffer
-	cmd := exec.Command(command, args...)
+	cmd := exec.Command("wsl", args...)
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf
 	err := cmd.Run()
