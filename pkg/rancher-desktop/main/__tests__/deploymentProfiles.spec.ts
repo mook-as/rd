@@ -41,6 +41,7 @@ describe('deployment profiles', () => {
 [${ FULL_PROFILE_PATH }]
 
 [${ FULL_DEFAULTS_PATH }]
+"version"=dword:0c
 
 [${ FULL_DEFAULTS_PATH }\\application]
 
@@ -91,6 +92,7 @@ describe('deployment profiles', () => {
 [${ FULL_PROFILE_PATH }]
 
 [${ FULL_PROFILE_PATH }\\Locked]
+"version"=dword:0c
 
 [${ FULL_PROFILE_PATH }\\Locked\\containerEngine]
 
@@ -118,6 +120,7 @@ describe('deployment profiles', () => {
 [${ FULL_PROFILE_PATH }]
 
 [${ FULL_DEFAULTS_PATH }]
+"version"=dword:0c
 
 [${ FULL_DEFAULTS_PATH }\\application]
 
@@ -160,6 +163,7 @@ describe('deployment profiles', () => {
 [${ FULL_PROFILE_PATH }]
 
 [${ FULL_DEFAULTS_PATH }]
+"version"=dword:0c
 
 [${ FULL_DEFAULTS_PATH }\\CONTAINERENGINE]
 "name"="moby"
@@ -214,6 +218,7 @@ describe('deployment profiles', () => {
       describe('defaults', () => {
         describe('happy paths', () => {
           const defaultUserProfile: RecursivePartial<settings.Settings> = {
+            version:     12,
             application: {
               debug:       true,
               adminAccess: false,
@@ -254,7 +259,8 @@ describe('deployment profiles', () => {
               },
             },
           };
-          const lockedUserProfile = {
+          const lockedUserProfile: RecursivePartial<settings.Settings> = {
+            version:         12,
             containerEngine: {
               allowedImages: {
                 enabled:  false,
@@ -289,7 +295,7 @@ describe('deployment profiles', () => {
             await installInRegistry(arrayFromSingleStringDefaultsUserRegFile);
             const profile = await readDeploymentProfiles(REGISTRY_PROFILE_PATHS);
 
-            expect(profile.defaults).toEqual({
+            expect(profile.defaults).toMatchObject({
               containerEngine: { allowedImages: { patterns: ['hokey smoke!'] }, name: 'moby' },
             });
           });
