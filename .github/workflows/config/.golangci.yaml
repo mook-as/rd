@@ -59,6 +59,7 @@ linters:
     - goimports
     - goprintffuncname
     - gosimple
+    - govet
     - ineffassign
     - misspell
     - typecheck
