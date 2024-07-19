@@ -53,7 +53,7 @@ func (h *HostConnector) ListenAndDial() error {
 	for {
 		conn, err := vl.Accept()
 		if err != nil {
-			logrus.Errorf("ListenAndDial accept connection: %v")
+			logrus.Errorf("ListenAndDial accept connection: %v", err)
 			continue
 		}
 		go h.handleConn(conn)
