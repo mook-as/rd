@@ -16,8 +16,6 @@ limitations under the License.
 package cmd
 
 import (
-	"os"
-
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -33,12 +31,14 @@ The host process on windows forwards the TCP payload to a given address over TCP
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
+// It returns the process exit code.
+func Execute() int {
 	writer := logrus.New().Writer()
 	defer writer.Close()
 	rootCmd.SetErr(writer)
 	err := rootCmd.Execute()
 	if err != nil {
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }

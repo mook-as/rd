@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-func GetPaths(getResourcesPathFuncs ...func() (string, error)) (Paths, error) {
+func GetPaths(getResourcesPathFuncs ...func() (string, error)) (*Paths, error) {
 	var getResourcesPathFunc func() (string, error)
 	switch len(getResourcesPathFuncs) {
 	case 0:
@@ -15,12 +15,12 @@ func GetPaths(getResourcesPathFuncs ...func() (string, error)) (Paths, error) {
 	case 1:
 		getResourcesPathFunc = getResourcesPathFuncs[0]
 	default:
-		return Paths{}, errors.New("you can only pass one function in getResourcesPathFuncs arg")
+		return nil, errors.New("you can only pass one function in getResourcesPathFuncs arg")
 	}
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return Paths{}, fmt.Errorf("failed to get user home directory: %w", err)
+		return nil, fmt.Errorf("failed to get user home directory: %w", err)
 	}
 	localAppData := os.Getenv("LOCALAPPDATA")
 	if localAppData == "" {
@@ -44,8 +44,8 @@ func GetPaths(getResourcesPathFuncs ...func() (string, error)) (Paths, error) {
 	}
 	paths.Resources, err = getResourcesPathFunc()
 	if err != nil {
-		return Paths{}, fmt.Errorf("failed to find resources directory: %w", err)
+		return nil, fmt.Errorf("failed to find resources directory: %w", err)
 	}
 
-	return paths, nil
+	return &paths, nil
 }

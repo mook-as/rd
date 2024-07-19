@@ -64,7 +64,8 @@ func convertToRegFormat(pathParts []string, structType reflect.Type, value refle
 		sortedStructFields := utils.SortStructFields(structType)
 		scalarReturnedLines := make([]string, 0, numTypedFields)
 		nestedReturnedLines := make([]string, 0)
-		for _, compoundStructField := range sortedStructFields {
+		for i := range sortedStructFields {
+			compoundStructField := &sortedStructFields[i]
 			fieldName := compoundStructField.FieldName
 			valueElement := value.MapIndex(reflect.ValueOf(fieldName))
 			if valueElement.IsValid() {
@@ -111,7 +112,7 @@ func convertToRegFormat(pathParts []string, structType reflect.Type, value refle
 			}
 			arrayValues[i] = item.String()
 		}
-		return []string{fmt.Sprintf(`"%s"=hex(7):%s`, jsonTag, stringToMultiStringHexBytes(arrayValues))}, nil
+		return []string{fmt.Sprintf(`%q=hex(7):%s`, jsonTag, stringToMultiStringHexBytes(arrayValues))}, nil
 	case reflect.Map:
 		returnedLines := []string{fmt.Sprintf("[%s]", strings.Join(pathParts, "\\"))}
 		mapKeys := utils.SortKeys(value.MapKeys())
@@ -135,23 +136,23 @@ func convertToRegFormat(pathParts []string, structType reflect.Type, value refle
 		return convertToRegFormat(pathParts, value.Type(), value, jsonTag, path)
 	case reflect.Bool:
 		boolValue := map[bool]int{true: 1, false: 0}[value.Bool()]
-		return []string{fmt.Sprintf(`"%s"=dword:%d`, jsonTag, boolValue)}, nil
+		return []string{fmt.Sprintf(`%q=dword:%d`, jsonTag, boolValue)}, nil
 	case reflect.Int, reflect.Int8, reflect.Int16,
 		reflect.Int32, reflect.Uint, reflect.Uint8, reflect.Uint16,
 		reflect.Uint32:
 		if value.CanConvert(reflect.TypeOf(int64(0))) {
 			value = value.Convert(reflect.TypeOf(int64(0)))
 		}
-		return []string{fmt.Sprintf(`"%s"=dword:%x`, jsonTag, value.Int())}, nil
+		return []string{fmt.Sprintf(`%q=dword:%x`, jsonTag, value.Int())}, nil
 	case reflect.Int64, reflect.Uint64:
 		if value.CanConvert(reflect.TypeOf(int64(0))) {
 			value = value.Convert(reflect.TypeOf(int64(0)))
 		}
-		return []string{fmt.Sprintf(`"%s"=qword:%x`, jsonTag, value.Int())}, nil
+		return []string{fmt.Sprintf(`%q=qword:%x`, jsonTag, value.Int())}, nil
 	case reflect.Float32, reflect.Float64:
-		return []string{fmt.Sprintf(`"%s"=dword:%x`, jsonTag, int(value.Float()))}, nil
+		return []string{fmt.Sprintf(`%q=dword:%x`, jsonTag, int(value.Float()))}, nil
 	case reflect.String:
-		return []string{fmt.Sprintf(`"%s"="%s"`, jsonTag, escape(value.String()))}, nil
+		return []string{fmt.Sprintf(`%q=%q`, jsonTag, escape(value.String()))}, nil
 	}
 	return nil, fmt.Errorf("convertToRegFormat: don't know how to process %s kind: %q, (%T), value: %v for var %q", path, kind, structType, value, jsonTag)
 }
@@ -180,7 +181,7 @@ func stringToMultiStringHexBytes(values []string) string {
 // @param profileType: "defaults" or "locked"
 // @param settingsBodyAsJSON - options marshaled as JSON
 // @returns: array of strings, intended for writing to a reg file
-func JSONToReg(hiveType string, profileType string, settingsBodyAsJSON string) ([]string, error) {
+func JSONToReg(hiveType, profileType, settingsBodyAsJSON string) ([]string, error) {
 	var actualSettingsJSON map[string]interface{}
 
 	fullHiveType, ok := map[string]string{"hklm": "HKEY_LOCAL_MACHINE", "hkcu": "HKEY_CURRENT_USER"}[hiveType]
@@ -204,8 +205,10 @@ func JSONToReg(hiveType string, profileType string, settingsBodyAsJSON string) (
 		return nil, err
 	}
 	if len(bodyLines) > 0 {
-		headerLines = append(headerLines, fmt.Sprintf("[%s\\%s\\%s]", fullHiveType, "SOFTWARE", "Policies"))
-		headerLines = append(headerLines, fmt.Sprintf("[%s\\%s\\%s\\%s]", fullHiveType, "SOFTWARE", "Policies", "Rancher Desktop"))
+		headerLines = append(
+			headerLines,
+			fmt.Sprintf("[%s\\%s\\%s]", fullHiveType, "SOFTWARE", "Policies"),
+			fmt.Sprintf("[%s\\%s\\%s\\%s]", fullHiveType, "SOFTWARE", "Policies", "Rancher Desktop"))
 	}
 	return append(headerLines, bodyLines...), nil
 }

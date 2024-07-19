@@ -146,7 +146,8 @@ func (e *EventMonitor) initializeRunningContainers(ctx context.Context) error {
 		return err
 	}
 
-	for _, container := range containers {
+	for i := range containers {
+		container := &containers[i]
 		if len(container.Ports) != 0 {
 			portMap, err := createPortMapping(container.Ports)
 			if err != nil {
