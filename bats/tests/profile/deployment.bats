@@ -194,7 +194,7 @@ api_set() {
     assert_failure
     assert_output --partial 'field "application.extensions.allowed.list" is locked'
 
-    run api_set '"kubernetes": {"version": "1.16.15"}'
+    run api_set '"kubernetes": {"version": "'"$KUBERNETES_RANDOM_VERSION"'"}'
     assert_failure
     assert_output --partial 'field "kubernetes.version" is locked'
 }
@@ -255,7 +255,7 @@ api_set() {
     # Make sure that Rancher Desktop has really stopped; otherwise `rdctl start/yarn dev` may not launch a new instance
     rdctl shutdown
 
-    launch_the_application --kubernetes.version="1.16.15"
+    launch_the_application --kubernetes.version="$KUBERNETES_RANDOM_VERSION"
     try --max $numTries --delay 5 assert_file_contains "$PATH_LOGS/background.log" 'field "kubernetes.version" is locked'
     # And again verify that the app is no longer running
     rdctl shutdown
