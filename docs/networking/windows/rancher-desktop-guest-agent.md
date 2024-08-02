@@ -174,10 +174,14 @@ sequenceDiagram
     note over dockerd,containerd: adding port
     alt containerd
       containerd ->> guest-agent: /tasks/start
-      guest-agent ->> guest-agent: loopback iptables
+      opt localhost
+        guest-agent ->> guest-agent: loopback iptables
+      end
     else dockerd
       dockerd ->> guest-agent: event[start]
-      guest-agent ->> guest-agent: loopback iptables
+      opt localhost
+        guest-agent ->> guest-agent: loopback iptables
+      end
     else kubernetes
       kubernetes ->> guest-agent: event[not deleted]
     else iptables

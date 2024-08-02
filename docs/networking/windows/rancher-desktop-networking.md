@@ -43,7 +43,9 @@ services  <---->  tapDevice
 vsockVM <-- AF_VSOCK ---> vsockHost
 ```
 
-## host-switch:
+## Components
+
+### host-switch:
 
 The host-switch runs on the Windows host and acts as a receiver for all traffic originating from the network namespace within the WSL VM. It performs a handshake to identify the correct VM to communicate with over `AF_VSOCK`. This process retrieves the GUID for the appropriate Hyper-V VM (most likely WSL). It then performs a handshake with the network-setup process running in the WSL distribution to ensure the `AF_VSOCK` connection is established with the correct VM. Once the ready signal is received from the vm-switch, an `AF_VSOCK` connection is established to listen for incoming traffic from that VM. Additionally, the host-switch provides a DNS resolver that runs in the user space network and an API for dynamic port forwarding. The port forwarding API offers the following endpoints:
 
@@ -51,19 +53,19 @@ The host-switch runs on the Windows host and acts as a receiver for all traffic 
 - `/services/forwarder/expose`: Exposes a port.
 - `/services/forwarder/unexpose`: Unexposes a port.
 
-## Supported Flags:
+#### Supported Flags:
 
 - **debug**: Enables debug logging.
 - **subnet**: This flag defines a subnet range with a CIDR suffix for a virtual network. If it is not defined, it uses `192.168.127.0/24` as the default range. It is important to note that this value needs to match the [subnet](https://github.com/rancher-sandbox/rancher-desktop-networking/blob/6abacdc804d6414f17439a97f22e0c9c87f6249d/cmd/vm/switch_linux.go#L59) flag in the vm-switch.
 - **port-forward**: This is a list of static ports that need to be pre-forwarded to the WSL VM. These ports are not dynamically retrieved from any of the APIs that the Rancher Desktop guest agent interacts with.
 
-## network-setup:
+### network-setup:
 
 The reason for its creation was that the `AF_VSOCK` connection could not be established between the host and a process residing inside the network namespace within the VM, as such capability is not currently supported by `AF_VSOCK`. As a result, the network setup was created. Its main responsibility is to respond to the handshake request from the `host-switch.exe`. Once the handshake process is successful with the `host-switch`, the `network-setup` process creates a new network namespace and attempts to start its subprocess, `vm-switch`, in the newly created network namespace. It also hands over the `AF_VSOCK` connection to the `vm-switch` as a file descriptor in the new namespace.
 
-Additionally, it calls unshare with provided arguments through [---unshare-args](https://github.com/rancher-sandbox/rancher-desktop-networking/blob/6abacdc804d6414f17439a97f22e0c9c87f6249d/cmd/network/setup_linux.go#L272). The process also establishes a Virtual Ethernet pair consisting of two endpoints: `veth-rd0` and `veth-rd1`. `veth-rd0` resides within the default namespace and is configured to listen on the IP address `192.168.1.1`. Conversely, `veth-rd1` is located within a network namespace and is assigned the IP address `192.168.1.2`. The virtual Ethernet pair allows accessibility from the default network into the network namespace, which is particularly useful when WSL integration is enabled.
+Additionally, it calls unshare with provided arguments through [`--unshare-args`](https://github.com/rancher-sandbox/rancher-desktop-networking/blob/6abacdc804d6414f17439a97f22e0c9c87f6249d/cmd/network/setup_linux.go#L272). The process also establishes a Virtual Ethernet pair consisting of two endpoints: `veth-rd0` and `veth-rd1`. `veth-rd0` resides within the default namespace and is configured to listen on the IP address `192.168.1.1`. Conversely, `veth-rd1` is located within a network namespace and is assigned the IP address `192.168.1.2`. The virtual Ethernet pair allows accessibility from the default network into the network namespace, which is particularly useful when WSL integration is enabled.
 
-## Supported Flags:
+#### Supported Flags:
 
 - **debug**: enable the debug logging
 
@@ -81,13 +83,13 @@ Additionally, it calls unshare with provided arguments through [---unshare-args]
 
 - **logfile**: Path to the logfile for the `network-setup` process.
 
-## vm-switch:
+### vm-switch:
 
 Once the network-setup starts the `vm-switch` process in the new namespace, the `vm-switch` creates a tap device (`eth0`) and a loopback device (`lo`). When the `eth0` tap device is successfully created, it uses the `DHCP` client to acquire an IP address within the defined range from the `DHCP` server. Once the `eth0` tap device is up and running, the kernel forwards all raw Ethernet frames originating from the network namespace to the tap device. In addition to the traffic from the network namespace, the kernel also forwards all the traffic that arrives at `veth-rd1` from its pair, `veth-rd0`, in the default namespace.
 
 The tap device forwards the Ethernet frames over [vsock](https://wiki.qemu.org/Features/VirtioVsock) to the host. The process on the host (`host-switch.exe`) decapsulates the frames. Since host-switch maintains both internal (`vm-switch` to `host-switch.exe`) and external (`host-switch.exe` to the internet) connections, it connects to the external endpoints via syscalls.
 
-## Supported Flags:
+#### Supported Flags:
 
 - **debug**: Enable the debug logging
 
@@ -99,11 +101,11 @@ The tap device forwards the Ethernet frames over [vsock](https://wiki.qemu.org/F
 
 - **logfile**: Path to `vm-switch` process logfile
 
-## wsl-proxy:
+### wsl-proxy:
 
 Its primary function comes into play when WSL integration is activated alongside the network tunnel. Running within the default network namespace, it establishes a Unix socket listener (`/run/wsl-proxy.sock`) for the guest agent process to connect to from inside the network namespace. The guest agent forwards port mappings from various APIs (docker, containerd, and K8s) over the Unix socket to the `wsl-proxy`. Upon receiving the port mappings, the wsl-proxy sets up listeners bound to localhost for those ports. When traffic arrives at these listeners, it forwards the traffic to the bridge interface connecting the default namespace to the namespaced network, facilitating bidirectional traffic flow.
 
-## Supported Flags:
+#### Supported Flags:
 
 - **debug**: Enable the debug logging
 
@@ -114,34 +116,137 @@ Its primary function comes into play when WSL integration is activated alongside
 - **upstreamAddress**: This is the IP address associated with the upstream server to use. It corresponds to the address of the veth pair connecting the default namespace to the network namespace, specifically `veth-rd1`. The default value is `192.168.1.2`.
 
 
-## Process Timelines:
+## Process Lifetimes:
 
 Below is a flow chart that demonstrates the process start up orders.
 
 ```mermaid
 sequenceDiagram
-    participant wsl-init (pid n)
-    participant network-setup
-    participant vm-switch
-    participant wsl-init (pid 1)
-    participant host-switch.exe
-    Note over wsl-init (pid n),wsl-init (pid 1): WSL distro (Network Namespace)
-    Note over host-switch.exe: windows host
-    wsl-init (pid n)->>network-setup: spawn process
-    host-switch.exe->>network-setup: handshake request
-    network-setup->>host-switch.exe: handshake response (READY signal)
-    host-switch.exe->>network-setup: vsock listener ready
-    network-setup->>network-setup: open vsock
-    network-setup->>network-setup: create namespace
-    network-setup->>network-setup: create veth pair (veth-rd)
-    network-setup->>vm-switch: spawn
+    box WSL distro (Network namespace)
+      participant wsl-init (pid n)
+      participant network-setup
+      participant vm-switch
+      participant wsl-init (pid 1)
+      participant guest-agent
+    end
+    box Windows host
+      participant host-switch.exe
+    end
+    wsl-init (pid n)  ->> network-setup: spawn
+    host-switch.exe   ->> network-setup: handshake request
+    network-setup     ->> host-switch.exe: handshake response (READY signal)
+    host-switch.exe   ->> network-setup: vsock listener ready
+    network-setup     ->> network-setup: open vsock
+    network-setup     ->> network-setup: create namespace
+    network-setup     ->> network-setup: create veth pair (veth-rd)
+    network-setup     ->> vm-switch: spawn
     Note over network-setup,vm-switch: spawn in network namespace
     Note over network-setup,vm-switch: pass in vsock connection as fd
-    network-setup->>wsl-init (pid 1): spawn
+    network-setup     ->> wsl-init (pid 1): spawn
     Note over network-setup,wsl-init (pid 1): spawns in netns, new mnt/pid ns
-    vm-switch->>vm-switch: create lo/eth0
-    vm-switch->>vm-switch: DHCP eth0
-    vm-switch->>vm-switch: listen for ethernet frames
-    vm-switch->>host-switch.exe: forward ethernet
-    wsl-init (pid 1)-->>wsl-init (pid 1): Spawn /sbin/init
+    vm-switch         ->> vm-switch: create lo/eth0
+    vm-switch         ->> vm-switch: DHCP eth0
+    vm-switch         ->> vm-switch: listen for ethernet frames
+    vm-switch         ->> host-switch.exe: forward ethernet
+    wsl-init (pid 1) -->> wsl-init (pid 1): exec /sbin/init
+    wsl-init (pid 1)  ->> guest-agent: spawn
 ```
+
+Also see [Guest Agent details](rancher-desktop-guest-agent.md).
+
+## Steady State
+
+Please also see [Process Lifetimes](#process-lifetimes) above.
+
+The bulk of the work is done in the guest agent.
+
+```mermaid
+flowchart TB
+  subgraph host-switch[host-switch.exe]
+    gvisor([gVisor-tap-vsock])
+  end
+  port-tracker -- "http://192.168.127.1/services/forwarder/*" --> gvisor
+  subgraph vm[WSL virtual machine]
+    other-distros -- TCP traffic --> wsl-proxy
+    subgraph namespace[Network namespace]
+      subgraph guest-agent[Guest Agent]
+        docker([docker events API])
+        containerd([containerd events API])
+        kubernetes([Kubernetes events API])
+        iptables-watcher(["iptables (only old Kube)"])
+        port-tracker([guest agent port tracker])
+        forwarder([guest agent forwarder])
+        loopback-iptables([guest agent iptables loopback])
+        listener([listener])
+
+        containerd -- "listening ports" --> port-tracker
+        containerd -- "listening ports" --> loopback-iptables
+        docker -- "listening ports" --> port-tracker
+        docker -- "listening ports" --> loopback-iptables
+        kubernetes -- "listening ports (old Kube only)" --> listener
+        kubernetes -- "listening ports (new Kube only)" --> port-tracker
+        iptables-watcher -- "scrape" --> listener
+        port-tracker --> forwarder
+      end
+      iptables
+    end
+    wsl-proxy["wsl-proxy<br>(default namespace listeners)"]
+    other-distros(("other distros"))
+
+    loopback-iptables -- "(only when listening on 127.0.0.1)" --> iptables
+    forwarder -- "<tt>/run/wsl-proxy.sock</tt><br>control socket" --> wsl-proxy
+  end
+  namespace -- "ethernet traffic" --> gvisor
+```
+
+<table>
+  <tr>
+    <th>Feature
+    <th>Description
+  <tr>
+    <td>Docker port forwarding
+    <td><ul>
+      <li><tt>guest-agent</tt> observes container changes from docker events API.
+      <li>Only if listener is localhost:
+        <ul>
+          <li><tt>iptables</tt> rule is added so that connection from any
+              interface is redirected to the existing listener (to support
+              traffic coming from the host's <tt>localhost</tt> interface).
+        </ul>
+      <li>Call gVisor API in <tt>host-switch</tt> to set up port forwarding.
+  <tr>
+    <td><tt>containerd</tt> port forwarding
+    <td>Same as docker, using <tt>containerd</tt> events API.
+  <tr>
+    <td>Kubernetes port forwarding
+    <td><ul>
+      <li><tt>guest-agent</tt> observes service changes.
+      <li>Admin install on older Kubernetes:
+        <ul>
+          <li>Create a local listener.
+        </ul>
+      <li>Non-admin install, or newer Kubernetes:
+        <ul>
+          <li>Call gVisor API in <tt>host-switch</tt> to set up port forwarding.
+        </ul>
+      <li>Older Kubernetes (regardless of admin install):
+        <ul>
+          <li>Create a local listener.
+        </ul>
+  <tr>
+    <td>WSL integration: docker socket
+    <td><ul>
+      <li>Only enabled when using moby backend.
+      <li>Triggered by JavaScript backend.
+      <li><tt>wsl-helper docker-proxy serve</tt>
+      <li>Creates a listener at <tt>/var/run/docker.sock</tt> and forwards over
+          <tt>/mnt/wsl/rancher-desktop/run/docker.sock</tt> with rewriting.
+  <tr>
+    <td>WSL integration: kubeconfig
+    <td><ul>
+      <li>Only enabled when Kubernetes is enabled
+      <li><tt>wsl-helper kubeconfig --enable=?</tt>
+      <li>Symlinks <tt>~/.kube/config</tt> to Windows <tt>~/.kube/config</tt>,
+          aborts if existing Linux kubeconfig has non-RD clusters etc.
+
+</table>
