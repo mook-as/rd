@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func DeleteData(appPaths paths.Paths, removeKubernetesCache bool) error {
+func DeleteData(appPaths *paths.Paths, removeKubernetesCache bool) error {
 	if err := autostart.EnsureAutostart(false); err != nil {
 		logrus.Errorf("Failed to remove autostart configuration: %s", err)
 	}

@@ -42,7 +42,7 @@ func TestGetPaths(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error getting actual paths: %s", err)
 		}
-		if actualPaths != expectedPaths {
+		if *actualPaths != expectedPaths {
 			t.Errorf("Actual paths does not match expected paths\nActual paths: %#v\nExpected paths: %#v", actualPaths, expectedPaths)
 		}
 	})
@@ -81,7 +81,7 @@ func TestGetPaths(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error getting actual paths: %s", err)
 		}
-		if actualPaths != expectedPaths {
+		if *actualPaths != expectedPaths {
 			t.Errorf("Actual paths does not match expected paths\nActual paths: %#v\nExpected paths: %#v", actualPaths, expectedPaths)
 		}
 	})

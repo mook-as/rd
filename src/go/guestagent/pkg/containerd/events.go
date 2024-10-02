@@ -412,7 +412,7 @@ func createPortMappingFromString(portMapping string) (nat.PortMap, error) {
 
 	portMap := make(nat.PortMap)
 
-	if len(portMapping) == 0 {
+	if portMapping == "" {
 		return portMap, nil
 	}
 
@@ -449,7 +449,7 @@ func extractIPAddress(pid string) (string, error) {
 		return "", err
 	}
 	// Regular expression pattern to match the IP address
-	rx := regexp.MustCompile(`\binet\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/\d{1,2}`)
+	rx := regexp.MustCompile(`\binet\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/\d{1,2}`)
 
 	matches := rx.FindStringSubmatch(string(output))
 	segments := 2
@@ -465,7 +465,7 @@ func extractIPAddress(pid string) (string, error) {
 // however module requires Go 1.20
 // mustFormatHashWithPrefix returns a string of given length that begins with the
 // given prefix. It is filled with entropy based on the given string toHash.
-func mustFormatHashWithPrefix(length int, prefix string, toHash string) string {
+func mustFormatHashWithPrefix(length int, prefix, toHash string) string {
 	if len(prefix) >= length || length > maxHashLen {
 		panic("invalid length")
 	}

@@ -102,7 +102,7 @@ func FinishShutdown(waitForShutdown bool, initiatingCommand InitiatingCommand) e
 	}
 }
 
-func (s *shutdownData) waitForAppToDieOrKillIt(checkFunc func() (bool, error), killFunc func() error, retryCount int, retryWait int, operation string) error {
+func (s *shutdownData) waitForAppToDieOrKillIt(checkFunc func() (bool, error), killFunc func() error, retryCount, retryWait int, operation string) error {
 	for iter := 0; s.waitForShutdown && iter < retryCount; iter++ {
 		if iter > 0 {
 			logrus.Debugf("checking %s showed it's still running; sleeping %d seconds\n", operation, retryWait)
