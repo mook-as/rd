@@ -53,6 +53,7 @@ linters:
     - bodyclose
     - copyloopvar
     - dogsled
+    - dupl
     - errcheck
     - goconst
     - gofmt
@@ -107,3 +108,6 @@ issues:
       linters: [ staticcheck ]
       text: "SA4006: this value of `(group|ctx)` is never used"
       source: group, ctx := errgroup.WithContext\(groupCtx\)
+    - # Don't de-duplicate different commands.
+      path: src/go/rdctl/cmd/extension(Install|Uninstall)\.go$
+      linters: [ dupl ]
