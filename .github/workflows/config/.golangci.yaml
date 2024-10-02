@@ -63,6 +63,7 @@ linters:
     - ineffassign
     - misspell
     - staticcheck
+    - stylecheck
     - typecheck
     - unconvert
     - unused
@@ -85,6 +86,11 @@ issues:
       text: "ST1005:"
       path: src/go/wsl-helper/cmd/kubeconfig.go
       source: errors.New\("Windows
+    - # Exclude ST1005 when it encounters errors starting with proper noun
+      linters: [ stylecheck ]
+      text: "ST1005:"
+      path: src/go/rdctl/pkg/lock/lock.go
+      source: fmt.Errorf\("Rancher Desktop
     - # Exclude long function declarations
       linters: [ lll ]
       source: ^\s*func\b
