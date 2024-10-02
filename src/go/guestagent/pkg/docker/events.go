@@ -23,6 +23,7 @@ import (
 	"github.com/Masterminds/log-go"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
@@ -62,7 +63,7 @@ func NewEventMonitor(portTracker tracker.Tracker) (*EventMonitor, error) {
 // MonitorPorts scans Docker's event stream API
 // for container start/stop events.
 func (e *EventMonitor) MonitorPorts(ctx context.Context) {
-	msgCh, errCh := e.dockerClient.Events(ctx, types.EventsOptions{
+	msgCh, errCh := e.dockerClient.Events(ctx, events.ListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("type", "container"),
 			filters.Arg("event", startEvent),

@@ -62,6 +62,7 @@ linters:
     - govet
     - ineffassign
     - misspell
+    - staticcheck
     - typecheck
     - unconvert
     - unused
@@ -94,3 +95,8 @@ issues:
     - # Ignore errors from syscall
       linters: [ dogsled ]
       source: ^\s*_, _, _ = .*\.Call\(
+    - # This seems to not be taking account of command line options.
+      path: src/go/guestagent/main.go
+      linters: [ staticcheck ]
+      text: "SA4006: this value of `(group|ctx)` is never used"
+      source: group, ctx := errgroup.WithContext\(groupCtx\)
