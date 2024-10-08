@@ -20,3 +20,4 @@
 /resources/win32/
 /screenshots/output/
 /src/go/rdctl/pkg/options/generated/*.go
+/.yarn/
