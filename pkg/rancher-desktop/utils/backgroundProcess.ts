@@ -94,8 +94,10 @@ export default class BackgroundProcess {
    * Attempt to start the process once.
    */
   protected async restart() {
-    if (!await this.shouldRun()) {
-      console.debug(`Not restarting ${ this.name } because shouldRun is ${ this.shouldRun }`);
+    const shouldRun = await this.shouldRun();
+
+    if (!shouldRun) {
+      console.debug(`Not restarting ${ this.name } because shouldRun is ${ shouldRun }`);
       await this.stop();
 
       return;

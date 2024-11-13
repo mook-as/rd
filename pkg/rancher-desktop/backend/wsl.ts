@@ -124,6 +124,38 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
       shouldRun: () => Promise.resolve([State.STARTING, State.STARTED, State.DISABLED].includes(this.state)),
     });
 
+    this.wslProxyProcess = new BackgroundProcess('wsl-proxy', {
+      spawn: async() => {
+        const stream = await Logging['wsl-proxy'].fdStream;
+        const args = ['--distribution', INSTANCE_NAME,
+          '--cd', '/usr/local/bin',
+          '--exec',
+          '/usr/local/bin/wsl-proxy',
+          '-debug', this.debug ? 'true' : 'false'];
+
+        return childProcess.spawn('wsl.exe', args, {
+          stdio:       ['ignore', stream, stream],
+          windowsHide: true,
+        });
+      },
+      shouldRun: () => {
+        if (!this.process) {
+          console.debug(`wsl-proxy: not running because /sbin/init is ${ this.process }`);
+
+          return Promise.resolve(false);
+        }
+        if (this.process.exitCode !== null || this.process.signalCode !== null) {
+          console.debug(`wsl-proxy: not running because exitCode=${ this.process.exitCode } / signalCode=${ this.process.signalCode }`);
+
+          return Promise.resolve(false);
+        }
+
+        console.debug(`wsl-proxy: shouldRun? state=${ this.state }`);
+
+        return Promise.resolve([State.STARTING, State.STARTED, State.DISABLED].includes(this.state));
+      },
+    });
+
     this.kubeBackend = kubeFactory(this);
   }
 
@@ -177,6 +209,11 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
    * to the vm-switch that is running in the WSL VM.
    */
   protected hostSwitchProcess: BackgroundProcess;
+
+  /**
+   * WSL-proxy process, running inside the WSL VM inside the default namespace.
+   */
+  protected wslProxyProcess: BackgroundProcess;
 
   readonly kubeBackend: KubernetesBackend;
   readonly executor = this;
@@ -432,21 +469,6 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
       console.log('Error setting up data distribution:', ex);
     } finally {
       await fs.promises.rm(workdir, { recursive: true, maxRetries: 3 });
-    }
-  }
-
-  /**
-   * Runs wsl-proxy process in the default namespace. This is to proxy
-   * other distro's traffic from default namespace into the network namespace.
-   */
-
-  protected async runWslProxy() {
-    const debug = this.debug ? 'true' : 'false';
-
-    try {
-      await this.execCommand('/usr/local/bin/wsl-proxy', '-debug', debug);
-    } catch (err: any) {
-      console.log('Error trying to start wsl-proxy in default namespace:', err);
     }
   }
 
@@ -1361,8 +1383,7 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
                   // just ignore any errors; all the script does is installing spin plugins and templates
                 }
               }
-              // Do not await on this, as we don't want to wait until the proxy exits.
-              this.runWslProxy().catch(console.error);
+              this.wslProxyProcess.start();
             }),
             this.progressTracker.action('Installing CA certificates', 100, this.installCACerts()),
             this.progressTracker.action('Installing helpers', 50, this.installWSLHelpers()),
