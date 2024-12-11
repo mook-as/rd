@@ -28,8 +28,11 @@ if git diff --exit-code; then
     exit
 fi
 
-export GIT_AUTHOR_NAME="Rancher Desktop GitHub Action"
-export GIT_AUTHOR_EMAIL="donotuse@rancherdesktop.io"
+export GIT_CONFIG_COUNT=2
+export GIT_CONFIG_KEY_0=user.name
+export GIT_CONFIG_VALUE_0="Rancher Desktop GitHub Action"
+export GIT_CONFIG_KEY_1=user.email
+export GIT_CONFIG_VALUE_1="donotuse@rancherdesktop.io"
 git add "$K3S_VERSIONS"
 git commit --signoff --message "Automated update: k3s-versions.json"
 git push origin "$BRANCH_NAME"
