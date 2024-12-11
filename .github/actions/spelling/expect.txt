@@ -37,6 +37,7 @@ APPLEID
 applescript
 APPLICATIONFOLDER
 AProject
+argjson
 ARPNOMODIFY
 ARPPRODUCTICON
 ARPURLINFOABOUT
@@ -288,6 +289,7 @@ gcs
 GENERALIZEDTIME
 getfattr
 getwindowid
+gha
 ghp
 gitmodules
 gitrepo
@@ -469,6 +471,7 @@ loglines
 logrus
 logz
 lovelace
+ltrimstr
 mabels
 macarm
 machinedeployment
