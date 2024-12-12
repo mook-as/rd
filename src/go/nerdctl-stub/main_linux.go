@@ -24,7 +24,13 @@ const (
 )
 
 func spawn(opts spawnOptions) error {
-	args := []string{"--distribution", opts.distro, "--exec", opts.nerdctl, "--address", opts.containerdSocket}
+	args := []string{"--distribution", opts.distro}
+	if cwd, err := os.Getwd(); err == nil {
+		if mount, err := doBindMount(cwd); err == nil {
+			args = append(args, "--cd", mount)
+		}
+	}
+	args = append(args, "--exec", opts.nerdctl, "--address", opts.containerdSocket)
 	args = append(args, opts.args.args...)
 	cmd := exec.Command("wsl.exe", args...)
 	cmd.Stdin = os.Stdin

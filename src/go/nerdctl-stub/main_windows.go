@@ -13,7 +13,13 @@ import (
 )
 
 func spawn(opts spawnOptions) error {
-	args := []string{"--distribution", opts.distro, "--exec", "/usr/local/bin/wsl-exec", opts.nerdctl, "--address", opts.containerdSocket}
+	args := []string{"--distribution", opts.distro}
+	if cwd, err := os.Getwd(); err == nil {
+		if wslCwd, err := pathToWSL(cwd); err == nil {
+			args = append(args, "--cd", wslCwd)
+		}
+	}
+	args = append(args, "--exec", "/usr/local/bin/wsl-exec", opts.nerdctl, "--address", opts.containerdSocket)
 	args = append(args, opts.args.args...)
 	cmd := exec.Command("wsl.exe", args...)
 	cmd.Stdin = os.Stdin
