@@ -1588,12 +1588,16 @@ export default class WSLBackend extends events.EventEmitter implements VMBackend
 
       await this.progressTracker.action('Shutting Down...', 10, async() => {
         if (await this.isDistroRegistered({ runningOnly: true })) {
-          await this.stopService('k3s');
-          await this.stopService('docker');
-          await this.stopService('containerd');
-          await this.stopService('rd-openresty');
-          await this.stopService('rancher-desktop-guestagent');
-          await this.stopService('buildkitd');
+          const services = ['k3s', 'docker', 'containerd', 'rd-openresty',
+                            'rancher-desktop-guestagent', 'buildkitd'];
+          for (const service of services) {
+            try {
+              await this.stopService(service);
+            } catch (ex) {
+              // Do not allow errors here to prevent us from stopping.
+              console.error(`Failed to stop service ${ service }:`, ex)
+            }
+          }
           try {
             await this.stopService('local');
           } catch (ex) {
