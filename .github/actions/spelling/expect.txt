@@ -845,6 +845,7 @@ UAC
 ucmonitor
 udhcpc
 UEFI
+umoci
 Unauthed
 UNCONFIGURED
 unexpose
