@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -o errexit -o nounset
+set -o errexit -o nounset -o xtrace
 
 check_prerequisites() {
     if [[ -n ${RD_LINT_SKIP_SPELLING:-} ]]; then
@@ -37,6 +37,8 @@ check_prerequisites() {
             echo "Please install cpanminus first:" >&2
             if command -v zypper &>/dev/null; then
                 echo "zypper install perl-App-cpanminus" >&2
+            elif command -v apt &>/dev/null; then
+                echo "apt install cpanminus" >&2
             fi
             exit 1
             ;;
@@ -82,7 +84,7 @@ INPUTS=$(yq --output-format=json <<EOF
     use_magic_file: 1
     report-timing: 1
     warnings: bad-regex,binary-file,deprecated-feature,large-file,limited-references,no-newline-at-eof,noisy-file,non-alpha-in-dictionary,token-is-substring,unexpected-line-ending,whitespace-in-dictionary,minified-file,unsupported-configuration,no-files-to-check
-    use_sarif: ${CI:-0}${CI:+1}
+    use_sarif: ${CI:-0}
     extra_dictionary_limit: 20
     extra_dictionaries:
         cspell:software-terms/dict/softwareTerms.txt
@@ -109,6 +111,8 @@ INPUTS=$(yq --output-format=json <<EOF
         cspell:powershell/dict/powershell.txt
 EOF
 )
+
+# This is a speeeling errror
 
 export INPUTS
 
