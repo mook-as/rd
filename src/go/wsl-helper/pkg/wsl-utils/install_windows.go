@@ -25,6 +25,13 @@ func InstallWSL(ctx context.Context, log *logrus.Entry) error {
 	err := newRunnerFunc().
 		WithStderr(log.WriterLevel(logrus.InfoLevel)).
 		Run(ctx, "--install", "--no-distribution")
+	if exitError, ok := err.(*exec.ExitError); ok && exitError.ExitCode() == 1 {
+		// As of Windows 11 24H2 (fresh installs), `wsl --install` no longer takes
+		// `--no-distribution`.
+		err = newRunnerFunc().
+			WithStderr(log.WriterLevel(logrus.InfoLevel)).
+			Run(ctx, "--install")
+	}
 	if err != nil {
 		return err
 	}
