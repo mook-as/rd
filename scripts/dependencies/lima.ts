@@ -106,8 +106,8 @@ export class Lima implements Dependency, GitHubDependency {
 
 export class Qemu implements Dependency, GitHubDependency {
   name = 'qemu';
-  githubOwner = 'rancher-sandbox';
-  githubRepo = 'rancher-desktop-qemu';
+  githubOwner = 'mook-as';
+  githubRepo = 'qemu-packaging';
 
   async download(context: DownloadContext): Promise<void> {
     const baseUrl = `https://github.com/${ this.githubOwner }/${ this.githubRepo }/releases/download`;
