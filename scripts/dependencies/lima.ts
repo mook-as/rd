@@ -1,6 +1,5 @@
 // This downloads the resources related to Lima.
 
-import childProcess from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -24,18 +23,16 @@ import { simpleSpawn } from 'scripts/simple_process';
 
 export class Lima implements Dependency, GitHubDependency {
   name = 'lima';
-  githubOwner = 'rancher-sandbox';
+  githubOwner = 'mook-as';
   githubRepo = 'rancher-desktop-lima';
 
   async download(context: DownloadContext): Promise<void> {
     const baseUrl = `https://github.com/${ this.githubOwner }/${ this.githubRepo }/releases/download`;
-    let platform: string = context.platform;
-
-    if (platform === 'darwin') {
-      platform = `macos-15.${ process.env.M1 ? 'arm64' : 'amd64' }`;
-    } else {
-      platform = 'linux.amd64';
-    }
+    const platform: string = {
+      darwin: `macos-15.${ process.env.M1 ? 'arm64' : 'amd64' }`,
+      linux:  'linux.amd64',
+      win32:  'windows-latest.amd64',
+    }[context.platform];
 
     const url = `${ baseUrl }/v${ context.versions.lima }/lima.${ platform }.tar.gz`;
     const expectedChecksum = (await getResource(`${ url }.sha512sum`)).split(/\s+/)[0];
@@ -49,18 +46,10 @@ export class Lima implements Dependency, GitHubDependency {
     });
     await fs.promises.mkdir(limaDir, { recursive: true });
 
-    const child = childProcess.spawn('/usr/bin/tar', ['-xf', tarPath],
+    await simpleSpawn(
+      context.platform === 'win32' ? path.join(process.env.SystemRoot!, 'system32', 'tar.exe') : '/usr/bin/tar',
+      ['-xf', tarPath],
       { cwd: limaDir, stdio: 'inherit' });
-
-    await new Promise<void>((resolve, reject) => {
-      child.on('exit', (code, signal) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`Lima extract failed with ${ code || signal }`));
-        }
-      });
-    });
   }
 
   async getAvailableVersions(): Promise<string[]> {

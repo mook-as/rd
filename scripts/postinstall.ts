@@ -42,7 +42,6 @@ const userTouchedDependencies = [
 
 // Dependencies that are specific to unix hosts.
 const unixDependencies = [
-  new Lima(),
   new Qemu(),
   new AlpineLimaISO(),
 ];
@@ -91,6 +90,7 @@ const hostDependencies = [
   new tools.Steve(),
   new tools.RancherDashboard(),
   new MobyOpenAPISpec(),
+  new Lima(),
 ];
 
 async function downloadDependencies(items: DependencyWithContext[]): Promise<void> {
