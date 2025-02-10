@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -61,8 +62,13 @@ func init() {
 
 func doShellCommand(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
-	var commandName string
-	if runtime.GOOS == "windows" {
+
+	commandName, err := directories.GetLimactlPath()
+	if err != nil {
+		return err
+	}
+
+	if _, err = os.Stat(commandName); runtime.GOOS == "windows" && errors.Is(err, os.ErrNotExist) {
 		commandName = "wsl"
 		distroName := "rancher-desktop"
 		if !checkWSLIsRunning(distroName) {
@@ -79,10 +85,6 @@ func doShellCommand(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		if err = directories.SetupLimaHome(paths.AppHome); err != nil {
-			return err
-		}
-		commandName, err = directories.GetLimactlPath()
-		if err != nil {
 			return err
 		}
 		if !checkLimaIsRunning(commandName) {
