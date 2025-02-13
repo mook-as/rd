@@ -22,12 +22,15 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/rancher-sandbox/rancher-desktop/src/go/rdctl/pkg/directories"
 	p "github.com/rancher-sandbox/rancher-desktop/src/go/rdctl/pkg/paths"
+	"github.com/rancher-sandbox/rancher-desktop/src/go/rdctl/pkg/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/text/encoding/unicode"
@@ -87,6 +90,9 @@ func doShellCommand(cmd *cobra.Command, args []string) error {
 		if err = directories.SetupLimaHome(paths.AppHome); err != nil {
 			return err
 		}
+		if err = setupPathEnvVar(paths); err != nil {
+			return err
+		}
 		if !checkLimaIsRunning(commandName) {
 			// No further output wanted, so just exit with the desired status.
 			os.Exit(1)
@@ -98,6 +104,21 @@ func doShellCommand(cmd *cobra.Command, args []string) error {
 	shellCommand.Stdout = os.Stdout
 	shellCommand.Stderr = os.Stderr
 	return shellCommand.Run()
+}
+
+// Set up the PATH environment variable for limactl.
+func setupPathEnvVar(paths p.Paths) error {
+	if runtime.GOOS != "windows" {
+		// This is only needed on Windows.
+		return nil
+	}
+	msysDir := filepath.Join(utils.GetParentDir(paths.Resources, 2), "msys")
+	pathList := filepath.SplitList(os.Getenv("PATH"))
+	if slices.Contains(pathList, msysDir) {
+		return nil
+	}
+	pathList = append([]string{msysDir}, pathList...)
+	return os.Setenv("PATH", strings.Join(pathList, string(os.PathListSeparator)))
 }
 
 const restartDirective = "Either run 'rdctl start' or start the Rancher Desktop application first"
