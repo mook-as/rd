@@ -72,6 +72,7 @@ linters:
     - misspell
     - mnd
     - nakedret
+    - noctx
     - staticcheck
     - stylecheck
     - typecheck
