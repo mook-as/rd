@@ -71,6 +71,7 @@ linters:
     - ineffassign
     - misspell
     - mnd
+    - nakedret
     - staticcheck
     - stylecheck
     - typecheck
