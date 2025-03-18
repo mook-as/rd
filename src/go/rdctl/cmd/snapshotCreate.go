@@ -84,6 +84,7 @@ func createSnapshot(args []string) error {
 	if runtime.GOOS != "darwin" {
 		return nil
 	}
+	//nolint:gosec // manager.Paths.Snapshots is not a user input
 	execCmd := exec.Command("tmutil", "addexclusion", manager.Paths.Snapshots)
 	output, err := execCmd.CombinedOutput()
 	if err != nil {
