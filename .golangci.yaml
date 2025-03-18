@@ -101,9 +101,6 @@ issues:
       text: "ST1005:"
       path: src/go/rdctl/pkg/lock/lock.go
       source: fmt.Errorf\("Rancher Desktop
-    - # Exclude long function declarations
-      linters: [ lll ]
-      source: ^\s*func\b
     - # Exclude the FIXME comments from upstream
       path: src/go/wsl-helper/pkg/dockerproxy/platform/vsock_linux\.go
       linters: [ gocritic ]
