@@ -73,6 +73,7 @@ linters:
     - mnd
     - nakedret
     - noctx
+    - nolintlint
     - staticcheck
     - stylecheck
     - typecheck
