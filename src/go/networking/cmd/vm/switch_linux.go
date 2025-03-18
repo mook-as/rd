@@ -19,6 +19,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"os"
 	"os/exec"
@@ -190,6 +191,10 @@ func dhcp(ctx context.Context, iface string) error {
 
 func rx(ctx context.Context, conn io.Writer, tap *water.Interface, errCh chan error, mtu int) {
 	logrus.Info("waiting for packets...")
+	if mtu > math.MaxUint16 {
+		errCh <- fmt.Errorf("invalid MTU %d", mtu)
+		return
+	}
 	var frame ethernet.Frame
 	for {
 		select {
@@ -206,6 +211,7 @@ func rx(ctx context.Context, conn io.Writer, tap *water.Interface, errCh chan er
 			frame = frame[:n]
 
 			size := make([]byte, 2)
+			//nolint:gosec // We guard above that the MTU is less than MaxUint16
 			binary.LittleEndian.PutUint16(size, uint16(n))
 
 			if _, err := conn.Write(size); err != nil {
