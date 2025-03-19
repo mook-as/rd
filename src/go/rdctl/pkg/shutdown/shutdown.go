@@ -235,9 +235,9 @@ func deleteLima(ctx context.Context) error {
 
 func terminateRancherDesktopFunc(appDir string) func(context.Context) error {
 	return func(ctx context.Context) error {
-		var errors *multierror.Error
+		var errs *multierror.Error
 
-		errors = multierror.Append(errors, (func() error {
+		errs = multierror.Append(errs, (func() error {
 			mainExe, err := p.GetMainExecutable(ctx)
 			if err != nil {
 				return err
@@ -249,8 +249,8 @@ func terminateRancherDesktopFunc(appDir string) func(context.Context) error {
 			return process.KillProcessGroup(pid, false)
 		})())
 
-		errors = multierror.Append(errors, process.TerminateProcessInDirectory(appDir, true))
+		errs = multierror.Append(errs, process.TerminateProcessInDirectory(appDir, true))
 
-		return errors.ErrorOrNil()
+		return errs.ErrorOrNil()
 	}
 }
