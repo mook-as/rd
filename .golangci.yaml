@@ -1,9 +1,6 @@
 linters-settings:
   dupl:
     threshold: 100
-  funlen:
-    lines: 100
-    statements: 50
   goconst:
     min-len: 2
     min-occurrences: 3
@@ -18,10 +15,6 @@ linters-settings:
       - dupImport # https://github.com/go-critic/go-critic/issues/845
       - ifElseChain
       - unnamedResult
-      - whyNoLint
-      - wrapperFunc
-  gocyclo:
-    min-complexity: 15
   gosec:
     config:
       G306: "0644"
@@ -47,8 +40,6 @@ linters-settings:
       - ^strings\.SplitN$
       - ^tabwriter\.NewWriter$
       - ^utils\.GetParentDir$
-  lll:
-    line-length: 140
   nolintlint:
     allow-unused: false # report any unused nolint directives
     require-explanation: true
