@@ -36,7 +36,6 @@ linters-settings:
       - ^os\.FileMode$
       - ^os\.Mkdir(?:All)?$
       - ^os\.(?:Open|Write)File$
-      - ^s\.waitForAppToDieOrKillIt$
       - ^strings\.SplitN$
       - ^tabwriter\.NewWriter$
       - ^utils\.GetParentDir$
