@@ -137,8 +137,8 @@ async function goLangCILint(fix: boolean): Promise<boolean> {
 
   const platform = {
     darwin: 'darwin',
-    linux: 'linux',
-    win32: 'windows',
+    linux:  'linux',
+    win32:  'windows',
   }[process.platform as 'darwin' | 'linux' | 'win32'];
 
   return goLangCILintSingle(fix, platform);
