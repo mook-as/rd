@@ -60,8 +60,10 @@ export class Extension extends VersionedDependency {
     const fileContents = await fs.promises.readFile(EXTENSION_PATH, 'utf-8');
     const oldRef = `${ this.name }:${ await this.currentVersion }`;
     const newRef = `${ this.name }:${ newVersion }`;
+    const newContents = fileContents.replaceAll(oldRef, newRef);
 
-    await fs.promises.writeFile(EXTENSION_PATH, fileContents.replace(oldRef, newRef), 'utf-8');
+    console.log({fileContents, newContents, oldRef, newRef});
+    await fs.promises.writeFile(EXTENSION_PATH, newContents, 'utf-8');
 
     return new Set([EXTENSION_PATH]);
   }

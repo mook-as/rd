@@ -72,6 +72,7 @@ function git(returnOrArg: string | true, ...args: string[]): number | null {
     args.unshift(returnOrArg);
   }
 
+  console.log('git', args.map(a => a.replaceAll(process.env.GITHUB_TOKEN ?? '*', '*')));
   const result = spawnSync('git', args, {
     stdio: 'inherit',
     env:   {
