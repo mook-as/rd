@@ -3,7 +3,7 @@
  */
 
 import Cookies from 'cookie-universal';
-import Vue from 'vue';
+import Vue, { h } from 'vue';
 
 import router from './router';
 import store from './store';
@@ -18,7 +18,7 @@ import '../plugins/trim-whitespace';
 import '../plugins/v-select';
 import '../plugins/vue-js-modal';
 
-Vue.config.productionTip = false;
+import type { CompatVue } from '@vue/runtime-dom';
 
 // This does just the Vuex part of cookie-universal-nuxt, which is all we need.
 (store as any).$cookies = Cookies();
@@ -32,6 +32,6 @@ const component = matched?.components.default as any;
 const layoutName: string = component?.extendOptions?.layout ?? 'default';
 const { default: layout } = await import(`../layouts/${ layoutName }.vue`);
 
-new Vue({
-  router, store, render: h => h(layout),
+new (Vue as unknown as CompatVue)({
+  router, store, render: () => h(layout),
 }).$mount('#app');
