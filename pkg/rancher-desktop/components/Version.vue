@@ -20,9 +20,10 @@ export default defineComponent({
   computed: {
     getTooltip(): { content: string, placement: string, classes: string } {
       return {
-        content:   `<b>${ this.t('product.version') }</b>: ${ this.version }`,
-        placement: 'top',
-        classes:   'tooltip-footer',
+        content:     `<b>${ this.t('product.version') }</b>: ${ this.version }`,
+        html:        true,
+        placement:   'top',
+        popperClass: 'tooltip-footer',
       };
     },
   },
