@@ -7,8 +7,9 @@ import stream from 'stream';
 import tls from 'tls';
 import util from 'util';
 
+import * as k8s from '@kubernetes/client-node';
 import {
-  CustomObjectsApi, KubeConfig, V1ObjectMeta, findHomeDir, ApiException,
+  CustomObjectsApi, KubeConfig, V1ObjectMeta, ApiException,
 } from '@kubernetes/client-node';
 import { ActionOnInvalid } from '@kubernetes/client-node/dist/config_types';
 import _ from 'lodash';
@@ -931,7 +932,7 @@ export default class K3sHelper extends events.EventEmitter {
         }
       }
     }
-    const home = findHomeDir();
+    const home = k8s.findHomeDir();
 
     if (home) {
       const kubeDir = path.join(home, '.kube');
@@ -1159,7 +1160,7 @@ export default class K3sHelper extends events.EventEmitter {
         const minor = version.minor;
         const lowMinor = minor === 0 ? 0 : minor - 1;
         const highMinor = minor + 1;
-        const homeDirName = os.platform().startsWith('win') ? (findHomeDir() ?? '%HOME%') : '~';
+        const homeDirName = os.platform().startsWith('win') ? (k8s.findHomeDir() ?? '%HOME%') : '~';
         const kuberlrCacheDirName = `${ os.platform() }-${ process.env.M1 ? 'arm64' : 'amd64' }`;
         const options: Electron.MessageBoxOptions = {
           message: "Can't download a compatible version of kubectl in offline-mode",

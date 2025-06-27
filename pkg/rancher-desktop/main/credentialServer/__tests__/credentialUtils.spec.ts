@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import stream from 'stream';
 
-import { findHomeDir } from '@kubernetes/client-node';
+import * as k8s from '@kubernetes/client-node';
 
 import runCommand, { list } from '@pkg/main/credentialServer/credentialUtils';
 import { spawnFile } from '@pkg/utils/childProcess';
@@ -22,7 +22,7 @@ describe('runCommand', () => {
     const expected = `Some output`;
 
     jest.spyOn(fs.promises, 'readFile').mockImplementation((filepath) => {
-      const home = findHomeDir() ?? '';
+      const home = k8s.findHomeDir() ?? '';
 
       expect(filepath).toEqual(path.join(home, '.docker', 'config.json'));
 
@@ -47,7 +47,7 @@ describe('runCommand', () => {
     const error = new Error('Some error');
 
     jest.spyOn(fs.promises, 'readFile').mockImplementation((filepath) => {
-      const home = findHomeDir() ?? '';
+      const home = k8s.findHomeDir() ?? '';
 
       expect(filepath).toEqual(path.join(home, '.docker', 'config.json'));
 
@@ -73,7 +73,7 @@ describe('runCommand', () => {
   ])('helper $description', ({ host, executable }) => {
     beforeEach(() => {
       jest.spyOn(fs.promises, 'readFile').mockImplementation((filepath) => {
-        const home = findHomeDir() ?? '';
+        const home = k8s.findHomeDir() ?? '';
 
         expect(filepath).toEqual(path.join(home, '.docker', 'config.json'));
 
@@ -115,7 +115,7 @@ describe('list', () => {
 
   beforeEach(() => {
     jest.spyOn(fs.promises, 'readFile').mockImplementation((filepath) => {
-      const home = findHomeDir() ?? '';
+      const home = k8s.findHomeDir() ?? '';
 
       expect(filepath).toEqual(path.join(home, '.docker', 'config.json'));
 

@@ -1,3 +1,6 @@
+/** @jest-environment node */
+
+import {jest} from '@jest/globals';
 import RegistryAuth from '@pkg/backend/containerClient/auth';
 import * as childProcess from '@pkg/utils/childProcess';
 

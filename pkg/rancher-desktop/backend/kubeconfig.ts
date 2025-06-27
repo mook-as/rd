@@ -6,7 +6,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { findHomeDir, KubeConfig } from '@kubernetes/client-node';
+import * as k8s from '@kubernetes/client-node';
+import { KubeConfig } from '@kubernetes/client-node';
 import {
   ActionOnInvalid,
   ConfigOptions,
@@ -136,7 +137,7 @@ export async function getKubeConfigPaths(): Promise<string[]> {
 
   // We do not support locating kubeconfig files inside WSL distros, nor
   // in-cluster configs, so we only need to check the one path.
-  return [path.join(findHomeDir() ?? os.homedir(), '.kube', 'config')];
+  return [path.join(k8s.findHomeDir() ?? os.homedir(), '.kube', 'config')];
 }
 
 // The K8s JS library will get the current context but does not have the ability

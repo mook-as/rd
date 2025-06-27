@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import stream from 'stream';
 
-import { findHomeDir } from '@kubernetes/client-node';
+import * as k8s from '@kubernetes/client-node';
 
 import { spawnFile } from '@pkg/utils/childProcess';
 import Logging from '@pkg/utils/logging';
@@ -77,7 +77,7 @@ export async function list(): Promise<Record<string, string>> {
  * `$HOME/docker/config.json` doesn't exist, its JSON is corrupt, or it doesn't have a `credsStore` field.
  */
 async function getCredentialHelperInfo(command: string, payload: string): Promise<credHelperInfo> {
-  const home = findHomeDir();
+  const home = k8s.findHomeDir();
   const dockerConfig = path.join(home ?? '', '.docker', 'config.json');
   const contents = JSON.parse(await fs.promises.readFile(dockerConfig, { encoding: 'utf-8' }));
   const credHelpers = contents.credHelpers;
