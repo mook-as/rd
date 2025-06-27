@@ -1,3 +1,5 @@
+import type { MockInstance } from 'jest-mock/build'
+
 // `Symbol.dispose` exists as of NodeJS 20; if it's unset, set it (because we
 // are currently on NodeJS 18).
 (Symbol as any).dispose ??= Symbol.for('nodejs.dispose');
@@ -10,11 +12,14 @@
 export function withResource<
   T = any,
   Y extends any[] = any,
-  C = any,
-  U extends jest.MockInstance<T, Y, C> = any,
+  U extends MockInstance<T, Y> = any,
 >(input: U): U & Disposable {
+  const impl = input.getMockImplementation() as (...args: Y) => T;
   (input as any)[Symbol.dispose] = () => {
     input.mockRestore();
+    if (impl) {
+      input.mockImplementation(impl);
+    }
   };
 
   return input as U & Disposable;
