@@ -3,6 +3,7 @@
     "target": "ES2024",
     "module": "ESNext",
     "moduleResolution": "Node",
+    "moduleDetection": "force",
     "jsx": "react",
     "lib": [
       "ESNext",

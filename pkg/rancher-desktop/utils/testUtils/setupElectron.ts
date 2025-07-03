@@ -17,6 +17,7 @@ jest.unstable_mockModule('electron', () => {
     BrowserWindow: {},
     dialog: {},
     ipcMain: {},
+    ipcRenderer: {},
     nativeTheme: {},
     screen: {},
     shell: {},

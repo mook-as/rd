@@ -5,7 +5,7 @@ import { TS_EXT_TO_TREAT_AS_ESM, ESM_TS_TRANSFORM_PATTERN } from 'ts-jest';
 export default {
   transform: {
     [ESM_TS_TRANSFORM_PATTERN]: ['ts-jest', { useESM: true } ],
-    '^.+\\.vue$': '@vue/vue3-jest',
+    '^.+\\.vue$': './pkg/rancher-desktop/utils/testUtils/vue-jest.js',
   },
   transformIgnorePatterns: [],
   extensionsToTreatAsEsm: [...TS_EXT_TO_TREAT_AS_ESM, '.vue'],
@@ -30,6 +30,7 @@ export default {
   },
   setupFiles: [
     '<rootDir>/pkg/rancher-desktop/utils/testUtils/setupElectron.ts',
+    '<rootDir>/pkg/rancher-desktop/utils/testUtils/setupVue.ts',
   ],
   testEnvironment:        'jsdom',
   testEnvironmentOptions: {
