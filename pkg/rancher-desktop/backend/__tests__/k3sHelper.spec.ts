@@ -21,7 +21,7 @@ const cachePath = path.join(paths.cache, 'k3s-versions.json');
 const modules = mockModules({
   'node-fetch': {
     ...nodeFetch,
-    default: jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>((...args) => {
+    default: jest.fn<(...args: Parameters<typeof fetch>) => ReturnType<typeof fetch>>((...args) => {
       throw new Error('Unexpected network traffic');
     }),
   },

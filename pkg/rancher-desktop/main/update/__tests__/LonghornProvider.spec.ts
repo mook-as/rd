@@ -8,7 +8,6 @@ import type getWSLVersionType from '@pkg/utils/wslVersion';
 import type { WSLVersionInfo } from '@pkg/utils/wslVersion';
 
 import type { queryUpgradeResponder as queryUpgradeResponderType, UpgradeResponderRequestPayload } from '../LonghornProvider';
-import type { Response } from 'node-fetch';
 
 const itWindows = process.platform === 'win32' ? it : it.skip;
 const itUnix = process.platform !== 'win32' ? it : it.skip;
@@ -33,10 +32,10 @@ const standardMockedVersion: WSLVersionInfo = {
 };
 
 const modules = mockModules({
-  '@pkg/utils/fetch':        { default: jest.fn<Promise<Partial<Response>>, Parameters<typeof fetchType>>() },
-  '@pkg/utils/childProcess': { spawnFile: jest.fn<ReturnType<typeof spawnFileType>, Parameters<typeof spawnFileType>>() },
+  '@pkg/utils/fetch':        { default: jest.fn<(...args: Parameters<typeof fetchType>) => Promise<Partial<Awaited<ReturnType<typeof fetchType>>>>>() },
+  '@pkg/utils/childProcess': { spawnFile: jest.fn<typeof spawnFileType>() },
   '@pkg/utils/osVersion':    { getMacOsVersion: jest.fn(() => new semver.SemVer('12.0.0')) },
-  '@pkg/utils/wslVersion':   { default: jest.fn<ReturnType<typeof getWSLVersionType>, Parameters<typeof getWSLVersionType>>() },
+  '@pkg/utils/wslVersion':   { default: jest.fn<typeof getWSLVersionType>() },
 });
 
 describe('queryUpgradeResponder', () => {

@@ -123,8 +123,6 @@ export default {
       export default __default__;
     `;
 
-    console.log({ filename, code });
-
     return { code };
   },
 };

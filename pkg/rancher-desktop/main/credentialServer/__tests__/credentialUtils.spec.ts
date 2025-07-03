@@ -19,7 +19,7 @@ const modules = mockModules({
       readFile: jest.spyOn(fs.promises, 'readFile'),
     },
   },
-  '@pkg/utils/childProcess': { spawnFile: jest.fn<ReturnType<typeof spawnFileType>, Parameters<typeof spawnFileType>>() },
+  '@pkg/utils/childProcess': { spawnFile: jest.fn<(command: string, args: string[], options: object) => Promise<{ stdout?: string }>>() },
 });
 
 jest.mock('@pkg/utils/childProcess');

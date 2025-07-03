@@ -6,7 +6,6 @@ import path from 'path';
 import { jest } from '@jest/globals';
 
 import * as childProcess from '@pkg/utils/childProcess';
-import { Log } from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
 import mockModules from '../testUtils/mockModules';
 
@@ -16,7 +15,7 @@ const spawnFile = childProcess.spawnFile;
 const modules = mockModules({
   '@pkg/utils/childProcess': {
     ...childProcess,
-    spawnFile: jest.fn<ReturnType<typeof spawnFile>, Parameters<typeof spawnFile>>(),
+    spawnFile: jest.fn<(command: string, args: string[], options: any) => Promise<{}>>(),
   },
   '@pkg/utils/logging': {
     background: {

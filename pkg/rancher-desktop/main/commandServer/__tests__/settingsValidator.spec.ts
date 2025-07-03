@@ -19,7 +19,7 @@ const modules = mockModules({
     platform: jest.spyOn(os, 'platform'),
   },
   '@pkg/utils/osVersion': {
-    getMacOsVersion: jest.fn<SemVer, []>(() => new SemVer('13.5.0')),
+    getMacOsVersion: jest.fn<() => SemVer>(() => new SemVer('13.5.0')),
   },
 });
 

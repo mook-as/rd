@@ -11,8 +11,8 @@ import mockModules from '@pkg/utils/testUtils/mockModules';
 jest.mock('@pkg/utils/childProcess');
 
 const modules = mockModules({
-  crypto:                    { X509Certificate: jest.fn<crypto.X509Certificate, [crypto.BinaryLike]>() },
-  '@pkg/utils/childProcess': { spawnFile: jest.fn<ReturnType<typeof spawnFile>, Parameters<typeof spawnFile>>() },
+  crypto:                    { X509Certificate: jest.fn<(blob: crypto.BinaryLike) => crypto.X509Certificate>() },
+  '@pkg/utils/childProcess': { spawnFile: jest.fn<typeof spawnFile>() },
 });
 
 /**

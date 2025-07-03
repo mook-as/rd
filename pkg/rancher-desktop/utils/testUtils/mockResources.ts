@@ -10,11 +10,10 @@ import type { MockInstance } from 'jest-mock/build'
  * @note This will no longer be needed as of Jest 30 (where it's built in).
  */
 export function withResource<
-  T = any,
-  Y extends any[] = any,
-  U extends MockInstance<T, Y> = any,
+  T extends (...args: any) => any,
+  U extends MockInstance<T>,
 >(input: U): U & Disposable {
-  const impl = input.getMockImplementation() as (...args: Y) => T;
+  const impl = input.getMockImplementation();
   (input as any)[Symbol.dispose] = () => {
     input.mockRestore();
     if (impl) {
