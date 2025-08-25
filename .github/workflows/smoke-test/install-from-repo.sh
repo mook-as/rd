@@ -45,7 +45,18 @@ install_linux_opensuse() {
 
 # shellcheck disable=2329 # The function is invoked dynamically
 install_linux_fedora() {
-    dnf config-manager addrepo --from-repofile=https://download.opensuse.org/repositories/isv:/Rancher:/dev/fedora/isv:Rancher:dev.repo
+    local repo_file=https://download.opensuse.org/repositories/isv:/Rancher:/dev/fedora/isv:Rancher:dev.repo
+    if dnf config-manager --help | grep --quiet add-repo; then
+        # DNF 4 syntax
+        dnf config-manager --add-repo "$repo_file"
+    elif dnf config-manager addrepo --help | grep --quiet from-repofile; then
+        # DNF 5 syntax
+        dnf config-manager addrepo --from-repofile="$repo_file"
+    else
+        echo "Failed to determine how to add RPM repository" >&2
+        dnf --version >&2
+        exit 1
+    fi
     local version
     version=$(dnf --quiet info --showduplicates rancher-desktop.x86_64 \
         | awk -F: "\$1 ~ /Version/ && \$2 ~ /0\.release${RD_VERSION//./\\.}/ { print \$2 }" \

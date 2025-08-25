@@ -171,6 +171,7 @@ jobs:
         - { id: opensuse-leap, image: "registry.opensuse.org/opensuse/leap:latest" }
         - { id: debian, image: "debian:latest" }
         - { id: fedora, image: "fedora:latest" }
+        - { id: rocky, image: "rockylinux/rockylinux:latest" }
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.image }}
