@@ -62,3 +62,47 @@ export async function simpleSpawn(
     child.on('error', reject);
   });
 }
+
+/**
+ * A wrapper around child_process.spawnFile that captures output without
+ * depending on any of the `@pkg` code.  By default, stderr is ignored; however,
+ * that can be changed by passing in `options.stdio`.
+ * @param command The executable to execute.
+ * @param args Arguments to pass to the executable.
+ * @param options Options to pass to spawn().
+ * @returns The captured stdout and stderr.
+ */
+export async function simpleCapture(
+  command: string,
+  args?: string[],
+  options?: CommonSpawnOptions,
+): Promise<{ stdout: string; stderr: string }> {
+  args ??= [];
+  options ??= {};
+  options.windowsHide ??= true;
+
+  const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'inherit'], ...options });
+  const result = { stdout: '', stderr: '' };
+
+  child.stdout?.on('data', (chunk: string) => {
+    result.stdout += chunk.toString();
+  });
+  child.stderr?.on('data', (chunk: string) => {
+    result.stderr += chunk.toString();
+  });
+
+  return new Promise((resolve, reject) => {
+    child.on('exit', (code, signal) => {
+      if ((code === 0 && signal === null) || (code === null && signal === 'SIGTERM')) {
+        return resolve(result);
+      }
+      reject(JSON.stringify({
+        message: `Command failed: ${ [command].concat(args ?? []).join(' ') }`,
+        code,
+        signal,
+        ...result,
+      }));
+    });
+    child.on('error', reject);
+  });
+}

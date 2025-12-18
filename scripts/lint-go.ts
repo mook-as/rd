@@ -10,15 +10,14 @@ import { glob } from 'glob';
 import yaml from 'yaml';
 
 import { readDependencyVersions } from './lib/dependencies';
-
-import { spawnFile } from '@pkg/utils/childProcess';
+import { simpleSpawn, simpleCapture } from './simple_process';
 
 type SupportedPlatform = Extract<NodeJS.Platform, 'darwin' | 'linux' | 'win32'>;
 
 const fix = process.argv.includes('--fix');
 
 async function listFiles(...globs: string[]): Promise<string[]> {
-  const { stdout } = await spawnFile('git', ['ls-files', ...globs], { stdio: 'pipe' });
+  const { stdout } = await simpleCapture('git', ['ls-files', ...globs]);
 
   return stdout.split(/\r?\n/).filter(x => x);
 }
@@ -70,7 +69,7 @@ async function processLinkedModules(dir: string, fix: boolean): Promise<boolean>
   /** Run `go` with the given arguments, returning standard output. */
   async function go(...args: string[]): Promise<string> {
     console.log(['go', ...args].join(' '));
-    const { stdout } = await spawnFile('go', args, { cwd: dir, stdio: ['ignore', 'pipe', 'inherit'] });
+    const { stdout } = await simpleCapture('go', args, { cwd: dir });
 
     return stdout;
   }
@@ -120,7 +119,7 @@ async function syncModules(fix: boolean): Promise<boolean> {
   const modFiles = await listFiles('**/go.mod');
   const files = ['go.work', ...modFiles, ...await listFiles('**/go.sum')];
   const getChanges = async() => {
-    const { stdout } = await spawnFile('git', ['status', '--porcelain=1', '--', ...files], { stdio: 'pipe' });
+    const { stdout } = await simpleCapture('git', ['status', '--porcelain=1', '--', ...files]);
 
     return stdout.replace(/^\s+/, '').replace(/\s+$/, '');
   };
@@ -136,18 +135,21 @@ async function syncModules(fix: boolean): Promise<boolean> {
     }
   }
 
+  // Sync `go` lines in go.mod files to avoid errors if only one was updated.
+  await simpleSpawn('go', ['work', 'use']);
+
   const linkedModulesOk = await Promise.all(modFiles.map(f => processLinkedModules(path.dirname(f), fix)));
   if (linkedModulesOk.some(v => !v)) {
     return false;
   }
 
-  await spawnFile('go', ['work', 'sync']);
-  await Promise.all((await getModules()).map(cwd => spawnFile('go', ['mod', 'tidy'], { stdio: 'inherit', cwd })));
+  await simpleSpawn('go', ['work', 'sync']);
+  await Promise.all((await getModules()).map(cwd => simpleSpawn('go', ['mod', 'tidy'], { cwd })));
   if (!fix) {
     const changes = await getChanges();
 
     if (changes) {
-      const { stdout } = await spawnFile('git', ['diff', '--', ...files], { stdio: 'pipe' });
+      const { stdout } = await simpleCapture('git', ['diff', '--', ...files]);
 
       console.log('Had to make modifications');
       console.log(changes);
@@ -184,7 +186,7 @@ async function runGoLangCILint(platform: SupportedPlatform, ...args: string[]): 
 
   try {
     console.log(commandLine.join(' '));
-    await spawnFile(commandLine[0], commandLine.slice(1), { stdio: 'inherit' });
+    await simpleSpawn(commandLine[0], commandLine.slice(1));
 
     return true;
   } catch (ex) {
