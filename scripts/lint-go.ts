@@ -136,6 +136,9 @@ async function syncModules(fix: boolean): Promise<boolean> {
     }
   }
 
+  // Sync `go` lines in go.mod files to avoid errors if only one was updated.
+  await spawnFile('go', ['work', 'use']);
+
   const linkedModulesOk = await Promise.all(modFiles.map(f => processLinkedModules(path.dirname(f), fix)));
   if (linkedModulesOk.some(v => !v)) {
     return false;
