@@ -10,6 +10,7 @@ on:
     - '**/go.mod'
     - '**/go.sum'
     - 'go.work'
+  workflow_dispatch:
 permissions:
   contents: write
 concurrency:
@@ -39,7 +40,27 @@ jobs:
         ref: ${{ github.head_ref }}
         fetch-depth: 3
         token: ${{ steps.get-token.outputs.token }}
-    - uses: ./.github/actions/yarn-install
+
+    # Avoid using .github/actions/yarn-install because it runs post-install
+    # scripts, which can fail because the go module versions may not match.
+    - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+      with:
+        node-version-file: package.json
+    - run: corepack enable yarn
+      shell: bash
+    - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+      with:
+        node-version-file: package.json
+        cache: yarn
+    - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+      with:
+        go-version-file: go.work
+        cache-dependency-path: src/go/**/go.sum
+    - run: yarn install --immutable --mode=skip-build
+      # We use skip-build so that we don't run post install scripts (which will
+      # attempt to compile golang binaries).
+      shell: bash
+
     - name: Determine go.mod files
       id: go-files
       run: >-
