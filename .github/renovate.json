@@ -1,0 +1,24 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>rancher/renovate-config#release"
+  ],
+  "baseBranchPatterns": [
+    "main"
+  ],
+  "enabledManagers": [
+    "jsonata"
+  ],
+  "customManagers": [
+    {
+      "customType": "jsonata",
+      "fileFormat": "yaml",
+      "managerFilePatterns": [
+        "pkg/rancher-desktop/assets/dependencies.yaml"
+      ],
+      "matchStrings": [
+        " $ . $each(function($v, $n) { $merge([{ \"name\": $n }, [$type($v) = \"object\"] ? $v]) }) [datasource=\"github-release-attachments\"] .( $dep := $; ($keys()[$match($, /^digest_/)]) .({ \"datasource\": $dep.datasource, \"depName\": $dep.repo, \"currentVersion\": $dep.version, \"currentDigest\": $lookup($dep, $) }) ) "
+      ]
+    }
+  ]
+}
