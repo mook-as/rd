@@ -1,0 +1,52 @@
+# This is the renovate configuration we are actually using.
+# We generate `renovate.json` using yq.
+# This is so we can have comments and multi-line strings.
+# This will probably be redone soon.
+$schema: https://docs.renovatebot.com/renovate-schema.json
+extends:
+- :ignoreModulesAndTests
+- group:monorepos
+- group:recommended
+- mergeConfidence:age-confidence-badges
+- replacements:all
+- workarounds:all
+- helpers:githubDigestChangelogs
+- helpers:goXPackagesChangelogLink
+- helpers:goXPackagesNameLink
+baseBranchPatterns:
+- main
+enabledManagers:
+- jsonata
+customManagers:
+- customType: regex
+  managerFilePatterns:
+  - /\.ya?ml$/
+  matchStrings:
+  - >-
+    # renovate:
+    datasource=(?<datasource>.*?)
+    depName=(?<depName>.*?)?(
+    extractVersion=(?<extractVersion>.*?))?\s+.+_(version|VERSION).*:(\s|"|)(?<currentValue>.*)("|)
+  - >-
+    # renovate:
+    datasource=(?<datasource>.*?)
+    depName=(?<depName>.*?)
+    digestVersion=(?<currentValue>.*)\s+.+_(sha256|arm64|amd64|arm|s390x).*:(\s|"|)(?<currentDigest>.*)("|)"
+- customType: jsonata
+  fileFormat: yaml
+  managerFilePatterns:
+  - pkg/rancher-desktop/assets/dependencies.yaml
+  matchStrings:
+  - >-
+    $ . $each(function($v, $n) { $merge([{ "name": $n }, [$type($v) = "object"] ? $v]) })
+    [datasource="github-release-attachments"]
+    .(
+        $dep := $;
+        ($keys()[$match($, /^digest_/)])
+        .({
+            "datasource": $dep.datasource,
+            "depName": $dep.repo,
+            "currentValue": $dep.version,
+            "currentDigest": $lookup($dep, $)
+        })
+    )
