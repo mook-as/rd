@@ -664,6 +664,7 @@ unexposing
 unparsable
 upcloud
 Upgradable
+upperdir
 useb
 userdb
 userpreference

@@ -71,20 +71,11 @@ fi
 # User impact: in-VM use of IPsec ESP (strongSwan, libreswan), AFS/kAFS, and
 # AF_ALG AEAD will fail.
 #
-# Implementation note — why rm -f works across all WSL distros:
-#   WSL2 provides the kernel modules via a single overlayfs superblock
-#   (mounted with uuid=on) that is set up in the initial kernel namespace
-#   and inherited by every WSL distro via mount-namespace propagation.
-#   Because uuid=on causes the kernel to reuse the same superblock for
-#   any mount with matching parameters, ALL running distros share the
-#   same overlayfs instance and see the same upper-dir state.  A whiteout
-#   written by wsl-init is therefore effective machine-wide, not just
-#   inside the rancher-desktop distro.
-#
-#   The upper dir lives in the WSL2 kernel's volatile rootfs (RAM-based,
-#   discarded on VM shutdown), so whiteouts are automatically cleared when
-#   the VM stops.  wsl-init re-applies them on every boot, giving a clean
-#   apply-on-start / forget-on-stop lifecycle with no cleanup required.
+# WSL2 mounts the kernel modules via a single overlayfs shared by every
+# distro through mount-namespace propagation, so the rm -f below applies
+# machine-wide.  The overlay's upperdir and workdir are in a tmpfs mount,
+# so whiteouts vanish on VM shutdown and wsl-init re-applies them on every
+# boot.
 rm -f \
     /lib/modules/*/kernel/net/ipv4/esp4.ko \
     /lib/modules/*/kernel/net/ipv4/esp4.ko.xz \
