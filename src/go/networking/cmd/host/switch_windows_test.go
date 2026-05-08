@@ -114,6 +114,32 @@ func TestFirstConnListener_ConcurrentAcceptOnlyReplaysOnce(t *testing.T) {
 	assert.Equal(t, 1, replayCount, "replay should happen exactly once across concurrent Accept calls")
 }
 
+func TestFirstConnListener_CloseBeforeAcceptClosesStashedConnection(t *testing.T) {
+	ln := localTCPListener(t)
+	defer ln.Close()
+
+	dialed, err := (&net.Dialer{}).DialContext(t.Context(), "tcp", ln.Addr().String())
+	require.NoError(t, err)
+	defer dialed.Close()
+	accepted, err := ln.Accept()
+	require.NoError(t, err)
+
+	wrapped := &firstConnListener{Listener: ln, first: accepted}
+	require.NoError(t, wrapped.Close())
+
+	// The stashed connection must be closed; reads return an error after Close.
+	_ = accepted.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
+	_, err = accepted.Read(make([]byte, 1))
+	assert.Error(t, err, "stashed connection should be closed after wrapper Close")
+
+	// A later Accept must not return the stashed connection.
+	conn, err := wrapped.Accept()
+	if conn != nil {
+		_ = conn.Close()
+	}
+	assert.Error(t, err, "Accept after Close should fail rather than replay")
+}
+
 func TestAcceptWithTimeout_TimesOutWhenNoConnection(t *testing.T) {
 	ln := localTCPListener(t)
 	// ln will be closed by acceptWithTimeout on timeout.

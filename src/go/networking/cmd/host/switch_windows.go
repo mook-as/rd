@@ -260,6 +260,16 @@ func (l *firstConnListener) Accept() (net.Conn, error) {
 	return l.Listener.Accept()
 }
 
+// Close releases the underlying listener and the stashed first connection if
+// no Accept has consumed it yet.  Marking served prevents a later Accept from
+// handing out a closed connection.
+func (l *firstConnListener) Close() error {
+	if l.served.CompareAndSwap(false, true) {
+		_ = l.first.Close()
+	}
+	return l.Listener.Close()
+}
+
 // handshakeWithRetry performs vsockHandshake and then validates that a real
 // peer is on the other end by waiting for the data connection it is about to
 // initiate.  If the validation times out (a phantom handshake — observed when
@@ -282,7 +292,7 @@ func handshakeWithRetry(ctx context.Context, handshakePort uint32, signature str
 		}
 		_ = ln.Close()
 		if ctx.Err() != nil {
-			return nil, err
+			return nil, ctx.Err()
 		}
 		lastErr = err
 		logrus.Warnf("handshake attempt %d unvalidated (%v); retrying", attempt, err)
