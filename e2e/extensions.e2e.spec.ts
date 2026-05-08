@@ -3,6 +3,7 @@
  * An E2E test is required to have access to the web page context.
  */
 
+import http from 'http';
 import os from 'os';
 import path from 'path';
 
@@ -279,22 +280,6 @@ test.describe.serial('Extensions', () => {
           exitCodes: [0],
         }));
       });
-
-      test('bypass CORS', async() => {
-        // This is the dashboard URL; it does not have CORS set up so it would
-        // normally fail to fetch due to CORS reasons.  However, this test case
-        // checks that our CORS bypass is working.
-        const url = 'http://127.0.0.1:6120/c/local/explorer/node';
-        const script = `
-          (async () => {
-            const result = await fetch('${ url }');
-            return Object.fromEntries(result.headers.entries());
-          })()
-        `;
-        const result = await evalInView(script);
-
-        expect(result).toHaveProperty('content-type');
-      });
     });
 
     test.describe('ddClient.docker', () => {
@@ -423,13 +408,26 @@ test.describe.serial('Extensions', () => {
         });
       });
       test('can fetch from external sources', async() => {
-        const url = 'http://127.0.0.1:6120/c/local/explorer/node'; // dashboard
-
-        await retry(async() => {
-          const result = evalInView(`ddClient.extension.vm.service.get("${ url }")`);
-
-          await expect(result).resolves.toContain('<title>Rancher</title>');
+        const contents = 'Hello from E2E tests';
+        const server = http.createServer((req, res) => {
+          // This server does not include CORS headers; it would fail without
+          // CORS bypass.
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end(contents);
         });
+        await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+        try {
+          const port = (server.address() as any).port;
+          const url = `http://127.0.0.1:${ port }/`;
+
+          await retry(async() => {
+            const result = evalInView(`ddClient.extension.vm.service.get("${ url }")`);
+
+            await expect(result).resolves.toContain(contents);
+          });
+        } finally {
+          server.close();
+        }
       });
       test.describe('can post values', () => {
         test('with string body', async() => {
