@@ -320,7 +320,7 @@ export class Trivy extends GlobalDependency(GitHubDependency) {
 
 export class Steve extends GlobalDependency(GitHubDependency) {
   readonly name = 'steve';
-  readonly githubOwner = 'rancher-sandbox';
+  readonly githubOwner = 'mook-as';
   readonly githubRepo = 'rancher-desktop-steve';
   readonly releaseFilter = 'published-pre';
 

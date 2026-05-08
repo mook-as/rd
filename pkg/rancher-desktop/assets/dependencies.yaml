@@ -91,13 +91,13 @@ trivy:
     trivy_0.70.0_Linux-64bit.tar.gz: sha256:8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9
     trivy_0.70.0_Linux-ARM64.tar.gz: sha256:2f6bb988b553a1bbac6bdd1ce890f5e412439564e17522b88a4541b4f364fc8d
 steve:
-  version: 0.1.0-beta9.1
+  version: 0.1.0-beta9.2
   checksums:
-    steve-linux-amd64.tar.gz: sha256:eb2f6b11ce0c46e27dceb8d2a7528b88e966d28d72a0ccb07c4022bf9c02b662
-    steve-linux-arm64.tar.gz: sha256:e9f50fabc0c2aaebc47c8372b8b835457e72b9d337e81405f818d440e82e8fb2
-    steve-darwin-amd64.tar.gz: sha256:c62c65b4af5ad8932c2a2f14a88617da597ea141751eead6297c0ab914f0cdd6
-    steve-darwin-arm64.tar.gz: sha256:972f7a1c7e288b445b3767f6220a5cac90aa4df7ced178cce4ad7c9179dc5226
-    steve-windows-amd64.tar.gz: sha256:5788fbbdf02a6efbf7baaea48c05b2e5ae4c213eb35cb6777c44bd66973b1f49
+    steve-darwin-amd64.tar.gz: sha256:d09c924376a92d422c293a07e9e0b8b7d478ae6366b2472eec756e3cb665f8ee
+    steve-darwin-arm64.tar.gz: sha256:b0b4782aa5645053c2835fe8bdd9e664af40afea5b74f32c6c192b6c486ab6f1
+    steve-linux-amd64.tar.gz: sha256:a68aab4c6966fe3d595c8f833069b41d1ac737b8cca8b06c14d018ec065c7cf8
+    steve-linux-arm64.tar.gz: sha256:b26a65a8aa67848c893f3c4da139db0932f06a92e125679fb533ff95c4d64ae6
+    steve-windows-amd64.tar.gz: sha256:27504fd82b248c110512d6839d5471f5e4386cf804c71c78f51a48a076bcf361
 rancherDashboard:
   version: 2.11.1.rd4
   checksums:
