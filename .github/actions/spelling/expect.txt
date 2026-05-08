@@ -137,6 +137,7 @@ dedot
 deepmap
 defattr
 deislabs
+DEPMAN
 destinationrule
 DETECTEXCEPTIONS
 developercertificate
