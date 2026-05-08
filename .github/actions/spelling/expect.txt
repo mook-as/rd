@@ -12,6 +12,7 @@ adrg
 airgap
 aks
 alertmanager
+algif
 alibaba
 aliyun
 aliyunecs
@@ -147,6 +148,7 @@ didinit
 diffdisk
 digitalocean
 dirents
+dirtyfrag
 distatus
 distros
 Dlg
@@ -202,6 +204,7 @@ factoryreset
 fakercfile
 fanotify
 fav
+fcrypt
 fdx
 featurename
 FEEEFEEE
@@ -443,6 +446,7 @@ pageup
 parsesection
 pascalize
 pathspec
+pcbc
 pcs
 pdp
 persistentvolume
@@ -524,6 +528,7 @@ resourcequota
 resourceset
 restclient
 restoretip
+reswan
 reusecab
 rioinfo
 rke
@@ -546,6 +551,7 @@ runlevel
 runtimeclass
 runtimeclasses
 rvf
+rxrpc
 scaleio
 scanbenchmark
 scanprofile
@@ -715,6 +721,7 @@ xauth
 XAUTHORITY
 xdev
 xec
+xfrm
 xfs
 xmlout
 xorg
