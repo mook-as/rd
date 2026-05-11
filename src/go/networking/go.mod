@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/Microsoft/go-winio v0.6.2
-	github.com/containers/gvisor-tap-vsock v0.8.8
+	github.com/containers/gvisor-tap-vsock v0.8.9
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/docker/go-connections v0.7.0
 	github.com/dustin/go-humanize v1.0.1
@@ -24,7 +24,7 @@ require (
 )
 
 require (
-	github.com/apparentlymart/go-cidr v1.1.0 // indirect
+	github.com/apparentlymart/go-cidr v1.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
