@@ -238,7 +238,7 @@ func (b *bindManager) mungeContainersCreateRequest(req *http.Request, contextVal
 
 	for _, mount := range body.HostConfig.Mounts {
 		logEntry := logrus.WithField("mount", fmt.Sprintf("%+v", mount))
-		if mount.Type.MountType != "bind" {
+		if mount.Type != "bind" {
 			logEntry.Trace("skipping mount of unsupported type")
 			continue
 		}

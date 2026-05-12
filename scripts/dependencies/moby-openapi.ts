@@ -18,7 +18,8 @@ export class MobyOpenAPISpec extends GlobalDependency(VersionedDependency) {
   readonly releaseFilter = 'custom';
 
   async download(context: DownloadContext): Promise<void> {
-    const baseUrl = `https://raw.githubusercontent.com/${ this.githubOwner }/${ this.githubRepo }/master/api/docs`;
+    const commit = 'b0c8ff7d0c990d28e67d0df3432abcdf6804d847';
+    const baseUrl = `https://raw.githubusercontent.com/${ this.githubOwner }/${ this.githubRepo }/${ commit }/api/docs`;
     const url = `${ baseUrl }/v${ context.versions.mobyOpenAPISpec }.yaml`;
     const outPath = path.join(process.cwd(), 'src', 'go', 'wsl-helper', 'pkg', 'dockerproxy', 'swagger.yaml');
     const modifiedPath = path.join(path.dirname(outPath), 'swagger-modified.yaml');
