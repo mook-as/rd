@@ -5,7 +5,10 @@ import { Options } from 'http-proxy-middleware';
 
 import Logging from '@pkg/utils/logging';
 
-import type { ErrorCallback, ProxyReqCallback, ProxyReqWsCallback } from 'http-proxy';
+type OnEvents = NonNullable<Options['on']>;
+type ProxyReqCallback = NonNullable<OnEvents['proxyReq']>;
+type ProxyReqWsCallback = NonNullable<OnEvents['proxyReqWs']>;
+type ErrorCallback = NonNullable<OnEvents['error']>;
 
 const console = Logging.dashboardServer;
 
