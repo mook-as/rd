@@ -8,7 +8,7 @@ import yaml from 'yaml';
 import CERT_MANAGER from '@pkg/assets/scripts/cert-manager.yaml';
 import INSTALL_CONTAINERD_SHIMS_SCRIPT from '@pkg/assets/scripts/install-containerd-shims';
 import CONTAINERD_CONFIG from '@pkg/assets/scripts/k3s-containerd-config.toml';
-import SECCOMP_PROFILE from '@pkg/assets/scripts/seccomp.json';
+import _SECCOMP_PROFILE_RAW from '@pkg/assets/scripts/seccomp.json';
 import SPIN_OPERATOR from '@pkg/assets/scripts/spin-operator.yaml';
 import { BackendSettings, VMExecutor } from '@pkg/backend/backend';
 import { LockedFieldError } from '@pkg/config/commandLineOptions';
@@ -21,6 +21,10 @@ import Logging from '@pkg/utils/logging';
 import paths from '@pkg/utils/paths';
 import { jsonStringifyWithWhiteSpace } from '@pkg/utils/stringify';
 import { showMessageBox } from '@pkg/window';
+
+// raw-loader returns the file's text at runtime, but resolveJsonModule
+// makes TypeScript see a parsed object.  Cast at the import.
+const SECCOMP_PROFILE = _SECCOMP_PROFILE_RAW as unknown as string;
 
 const CONTAINERD_CONFIG_TOML = '/etc/containerd/config.toml';
 const DOCKER_DAEMON_JSON = '/etc/docker/daemon.json';
