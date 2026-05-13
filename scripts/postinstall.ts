@@ -3,6 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
+import { Electron } from '@/scripts/dependencies/electron';
 import * as goUtils from '@/scripts/dependencies/go-source';
 import { Lima, Qemu, SocketVMNet, AlpineLimaISO } from '@/scripts/dependencies/lima';
 import { MobyOpenAPISpec } from '@/scripts/dependencies/moby-openapi';
@@ -103,6 +104,7 @@ const vmDependencies = [
 const hostDependencies = [
   new tools.Steve(),
   new tools.RancherDashboard(),
+  new Electron(),
   new MobyOpenAPISpec(),
 ];
 

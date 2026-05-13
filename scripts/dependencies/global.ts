@@ -1,6 +1,7 @@
 // Every global dependency whose version and checksums live in
 // `dependencies.yaml`.  Imported by `scripts/rddepman.ts`.
 
+import { Electron } from '@/scripts/dependencies/electron';
 import { AlpineLimaISO, Lima, Qemu, SocketVMNet } from '@/scripts/dependencies/lima';
 import { MobyOpenAPISpec } from '@/scripts/dependencies/moby-openapi';
 import * as tools from '@/scripts/dependencies/tools';
@@ -29,6 +30,7 @@ export const globalDependencies: VersionedDependency[] = [
   new Wix(),
   new MobyOpenAPISpec(),
   new Moproxy(),
+  new Electron(),
   new tools.WasmShims(),
   new tools.CertManager(),
   new tools.SpinOperator(),

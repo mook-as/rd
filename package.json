@@ -163,9 +163,6 @@
     "webpack": "5.100.2"
   },
   "dependenciesMeta": {
-    "electron": {
-      "built": true
-    },
     "esbuild": {
       "built": true
     },

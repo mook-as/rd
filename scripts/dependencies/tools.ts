@@ -26,7 +26,7 @@ function exeName(context: DownloadContext, name: string) {
   return `${ name }${ onWindows ? '.exe' : '' }`;
 }
 
-function cartesian<A extends string, B extends string>(
+export function cartesian<A extends string, B extends string>(
   as: readonly A[],
   bs: readonly B[],
 ): [A, B][] {
