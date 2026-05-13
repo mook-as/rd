@@ -2,7 +2,13 @@ package main
 
 import "strings"
 
-const seccompProfile = "/etc/rancher-desktop/seccomp.json"
+const (
+	seccompProfile  = "/etc/rancher-desktop/seccomp.json"
+	securityOptFlag = "--security-opt"
+	runCmd          = "run"
+	createCmd       = "create"
+	containerCmd    = "container"
+)
 
 // injectSeccompOpt splices --security-opt seccomp=<profile> into parsed args
 // for "run" and "create" subcommands (including "container run" / "container
@@ -15,7 +21,7 @@ func injectSeccompOpt(args []string) []string {
 		return args
 	}
 	for i, arg := range args {
-		if arg == "--security-opt" && i+1 < len(args) && strings.HasPrefix(args[i+1], "seccomp=") {
+		if arg == securityOptFlag && i+1 < len(args) && strings.HasPrefix(args[i+1], "seccomp=") {
 			return args
 		}
 		if strings.HasPrefix(arg, "--security-opt=seccomp=") {
@@ -24,7 +30,7 @@ func injectSeccompOpt(args []string) []string {
 	}
 	out := make([]string, 0, len(args)+2)
 	out = append(out, args[:pos]...)
-	out = append(out, "--security-opt", "seccomp="+seccompProfile)
+	out = append(out, securityOptFlag, "seccomp="+seccompProfile)
 	out = append(out, args[pos:]...)
 	return out
 }
@@ -56,11 +62,11 @@ func seccompInjectionPos(args []string) int {
 	}
 
 	switch args[i] {
-	case "run", "create":
+	case runCmd, createCmd:
 		return i + 1
-	case "container":
+	case containerCmd:
 		// "container" has no options of its own; the next element is the subcommand.
-		if i+1 < len(args) && (args[i+1] == "run" || args[i+1] == "create") {
+		if i+1 < len(args) && (args[i+1] == runCmd || args[i+1] == createCmd) {
 			return i + 2
 		}
 	}
