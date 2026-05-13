@@ -19,6 +19,15 @@ qemu:
     qemu-9.2.0.rd2-darwin-x86_64.tar.gz: sha256:c25f85aa32993b1974705a21515890a66a72f773d2f1a01758c207d827ace47d
     qemu-9.2.0.rd2-darwin-aarch64.tar.gz: sha256:1e65ce4c9c15da404732b446d434f05b373438d9a9ebf01a6082b3634cb0b3b1
     qemu-9.2.0.rd2-linux-x86_64.tar.gz: sha256:03c39317c9c87118853e4261d0fd082a724ef9617196b2921519a4e4794e9e8d
+electron:
+  version: 42.0.0
+  checksums:
+    electron-v42.0.0-darwin-arm64.zip: sha256:3c619bb8ec6a243142e392335382a3383739a9977ca85067cb1f31599ff993e5
+    electron-v42.0.0-darwin-x64.zip: sha256:49f6e7ebd60f84b687af933eda5e87dce9525e1139151ff4cfd53821d3285358
+    electron-v42.0.0-linux-arm64.zip: sha256:5531da08123d60d50c833997842e8371970bebe7d29261e00eaa83de948332b4
+    electron-v42.0.0-linux-x64.zip: sha256:83c7178dba2d0ce77e13743bf86beda75c6141caeeadb4340e1888bc96298b4b
+    electron-v42.0.0-win32-arm64.zip: sha256:7b207a76b62e62db4ff0b2f59692d8fbc670e6718e4601e334a366fd501a29dd
+    electron-v42.0.0-win32-x64.zip: sha256:2707fbf25e0e18211a00f90b97e0fb2a00cf10a17ef0fa9d873e177e1d3286bc
 socketVMNet:
   version: 1.2.2
   checksums:

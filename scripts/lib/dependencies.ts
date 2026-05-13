@@ -60,6 +60,7 @@ export interface DependencyVersions {
   dockerCLI:                       string;
   dockerBuildx:                    string;
   dockerCompose:                   string;
+  electron:                        string;
   'golangci-lint':                 string;
   trivy:                           string;
   steve:                           string;
