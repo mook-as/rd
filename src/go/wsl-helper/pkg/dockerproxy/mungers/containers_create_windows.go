@@ -68,10 +68,10 @@ func mungeContainersCreate(req *http.Request, contextValue *dockerproxy.RequestC
 		if mount == nil {
 			continue
 		}
-		if mount.Type.MountType == models.MountTypeNpipe {
+		if mount.Type == models.MountTypeNpipe {
 			logrus.WithField("mount", mount).Warn("named pipes are not supported")
 		}
-		if mount.Type.MountType != models.MountTypeBind {
+		if mount.Type != models.MountTypeBind {
 			// We only support bind mounts for now
 			continue
 		}

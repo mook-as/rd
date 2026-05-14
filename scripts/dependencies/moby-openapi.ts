@@ -57,6 +57,19 @@ export class MobyOpenAPISpec extends GlobalDependency(VersionedDependency) {
       delete contents.definitions[key]?.['x-go-name'];
     }
 
+    // The `allOf` here is meant to inherit from the reference and overwrite the
+    // description; however, this actually gets generated as having a property
+    // (named `MountType`) that is then a reference, which is the incorrect
+    // shape.  Since we do not care about descriptions, just override it here.
+    if (contents.definitions.MountPoint?.properties?.Type?.allOf) {
+      contents.definitions.MountPoint.properties.Type['$ref'] = '#/definitions/MountType';
+      delete contents.definitions.MountPoint.properties.Type.allOf;
+    }
+    if (contents.definitions.Mount?.properties?.Type?.allOf) {
+      contents.definitions.Mount.properties.Type['$ref'] = '#/definitions/MountType';
+      delete contents.definitions.Mount.properties.Type.allOf;
+    }
+
     // Moby is starting to add `x-go-type` annotations to the spec; however,
     // none of the types implement validation, and some types are not actually
     // defined in the file.  Override them here.
