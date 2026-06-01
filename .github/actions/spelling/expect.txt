@@ -489,6 +489,7 @@ portmap
 portmapping
 portproxy
 portstorage
+penpot
 postgres
 POSTROUTING
 prakhar
