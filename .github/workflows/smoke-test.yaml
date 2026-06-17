@@ -15,6 +15,18 @@ on:
           Download artifacts from release with this tag, rather than picking the
           first draft release.
         type: string
+      obs-project:
+        description: >
+          OpenSUSE Build Service project to download AppImage from, in the form
+          of "home:username:projectname". The default is the devel project used
+          in final pre-release smoke tests.
+        type: string
+        default: "isv:Rancher:dev"
+      skip-signing-checks:
+        description: >
+          Skip signature checks on downloaded artifacts (fails the tests).
+        type: boolean
+        default: false
 
 jobs:
   download-artifacts:
@@ -58,17 +70,20 @@ jobs:
 
     - name: Download AppImage
       run: |
+        # The OBS project needs to have a slash added after each colon.
+        OBS_DOWNLOAD_URL=https://download.opensuse.org/download/repositories/${OBS_PROJECT//:/:/}/AppImage/
         branch=$(cut -d. -f1,2 <<< "${RELEASE_TAG#v}")
         read -r artifact_name < <(
           curl "${OBS_DOWNLOAD_URL}?jsontable" \
             | jq --raw-output ".data[].name | select(endswith(\".AppImage\")) | select(contains(\".release${branch}.\"))"
           )
+        echo "Downloading ${artifact_name}"
         curl -L -o rancher-desktop.AppImage "${OBS_DOWNLOAD_URL}${artifact_name}"
         # The AppImage does not have a checksum; make one up.
         sha512sum rancher-desktop.AppImage > rancher-desktop.AppImage.sha512sum
         chmod a+x rancher-desktop.AppImage
       env:
-        OBS_DOWNLOAD_URL: https://download.opensuse.org/download/repositories/isv:/Rancher:/dev/AppImage/
+        OBS_PROJECT: ${{ inputs.obs-project }}
 
     - name: Upload macOS aarch-64 artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -152,6 +167,8 @@ jobs:
         name: application-${{ matrix.platform }}.zip
     - run: ${{ env.EXEC_COMMAND }} .github/workflows/smoke-test/smoke-test.sh
       shell: bash
+      env:
+        RD_SKIP_SIGNING_CHECKS: ${{ inputs.skip-signing-checks }}
     - name: Upload logs
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       if: always()
@@ -199,6 +216,7 @@ jobs:
       run: .github/workflows/smoke-test/install-from-repo.sh
       env:
         RD_VERSION: ${{ needs.download-artifacts.outputs.release-tag }}
+        OBS_PROJECT: ${{ inputs.obs-project }}
     - name: "openSUSE Workaround for #9145"
       if: contains(matrix.id, 'opensuse')
       run: >-
@@ -323,3 +341,13 @@ jobs:
         name: logs-appimage-${{ matrix.id }}.zip
         path: ${{ github.workspace }}/logs
         if-no-files-found: warn
+
+  flag-skipped-signing-checks:
+    name: Flag that signing checks were skipped
+    needs: [smoke-test,repository-smoke-test,appimage-smoke-test]
+    runs-on: ubuntu-latest
+    if: inputs.skip-signing-checks
+    steps:
+    - run: |
+        echo "Force failing smoke tests because signature checks were skipped." >&2
+        exit 1

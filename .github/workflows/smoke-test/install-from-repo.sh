@@ -5,6 +5,8 @@
 # Expected environment variables:
 #   RD_VERSION
 #      Rancher Desktop version; either major.minor (`1.20`) or the tag (`v1.20.0`).
+#   OBS_PROJECT
+#      The openSUSE Build Service project to use, in the form `isv:Rancher:dev`.
 
 set -o errexit -o nounset
 
@@ -18,10 +20,10 @@ install_linux_debian() {
 
     apt-get update
     apt-get install -y gnupg
-    curl -s https://download.opensuse.org/repositories/isv:/Rancher:/dev/deb/Release.key \
+    curl -s https://download.opensuse.org/repositories/${OBS_PROJECT//:/:/}/deb/Release.key \
         | gpg --dearmor \
         > "${keyLocation}/keyrings/isv-rancher-dev-archive-keyring.gpg"
-    echo "deb [signed-by=${keyLocation}/keyrings/isv-rancher-dev-archive-keyring.gpg] https://download.opensuse.org/repositories/isv:/Rancher:/dev/deb/ ./"\
+    echo "deb [signed-by=${keyLocation}/keyrings/isv-rancher-dev-archive-keyring.gpg] https://download.opensuse.org/repositories/${OBS_PROJECT//:/:/}/deb/ ./"\
         > /etc/apt/sources.list.d/isv-rancher-dev.list
     apt-get update
     version=$(apt-cache show --quiet rancher-desktop \
@@ -35,7 +37,7 @@ install_linux_debian() {
 
 # shellcheck disable=2329 # The function is invoked dynamically
 install_linux_opensuse() {
-    zypper --non-interactive addrepo https://download.opensuse.org/repositories/isv:/Rancher:/dev/rpm/isv:Rancher:dev.repo
+    zypper --non-interactive addrepo https://download.opensuse.org/repositories/${OBS_PROJECT//:/:/}/rpm/${OBS_PROJECT}.repo
     zypper --non-interactive --gpg-auto-import-keys install libxml2-tools
     local version
     version=$(zypper --xmlout --non-interactive search --details --match-exact rancher-desktop \
@@ -45,7 +47,7 @@ install_linux_opensuse() {
 
 # shellcheck disable=2329 # The function is invoked dynamically
 install_linux_fedora() {
-    dnf config-manager addrepo --from-repofile=https://download.opensuse.org/repositories/isv:/Rancher:/dev/fedora/isv:Rancher:dev.repo
+    dnf config-manager addrepo --from-repofile=https://download.opensuse.org/repositories/${OBS_PROJECT//:/:/}/fedora/${OBS_PROJECT}.repo
     local version
     version=$(dnf --quiet info --showduplicates rancher-desktop.x86_64 \
         | awk -F: "\$1 ~ /Version/ && \$2 ~ /0\.release${RD_VERSION//./\\.}/ { print \$2 }" \

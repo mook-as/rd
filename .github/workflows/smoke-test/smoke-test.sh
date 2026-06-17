@@ -8,6 +8,8 @@
 # Environment variables as inputs:
 #   RD_SKIP_INSTALL (Linux)
 #     Skip installing Rancher Desktop, and assume it was installed from the repo.
+#   RD_SKIP_SIGNING_CHECKS (macOS / Windows)
+#     Skip signature checks on downloaded artifacts.
 
 # Required tools:
 # - jq
@@ -89,11 +91,19 @@ install_darwin() {
     local srcApp="${mountpoint}/Rancher Desktop.app"
     local destApp="/Applications/Rancher Desktop.app"
 
-    codesign --verify --deep --strict --verbose=2 --check-notarization "$archiveName"
+    if [[ "${RD_SKIP_SIGNING_CHECKS:-}" != "true" ]]; then
+        codesign --verify --deep --strict --verbose=2 --check-notarization "$archiveName"
+    else
+        echo "Skipping signature checks on $archiveName." >&2
+    fi
     hdiutil attach "$archiveName" -mountpoint "$mountpoint"
     cleanups+=("hdiutil detach '$mountpoint'")
 
-    codesign --verify --deep --strict --verbose=2 --check-notarization "$srcApp"
+    if [[ "${RD_SKIP_SIGNING_CHECKS:-}" != "true" ]]; then
+        codesign --verify --deep --strict --verbose=2 --check-notarization "$srcApp"
+    else
+        echo "Skipping signature checks on $srcApp." >&2
+    fi
     mkdir -p "$destApp"
     cleanups+=("rm -rf '$destApp'")
 
@@ -158,6 +168,12 @@ install_linux() {
 win32_verify() {
     local path
     path="$(cygpath --windows "$1")"
+
+    if [[ "${RD_SKIP_SIGNING_CHECKS:-}" == "true" ]]; then
+        echo "Skipping signature checks on $path." >&2
+        return
+    fi
+
     # When running GitHub actions, using `powershell.exe` here causes issues
     # with loading the `Microsoft.PowerShell.Security` module; using `pwsh.exe`
     # seems to be fine.  This is probably because the default shell is pwsh, and
